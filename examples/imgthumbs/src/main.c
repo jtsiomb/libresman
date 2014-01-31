@@ -29,13 +29,13 @@ struct thumbnail *thumbs, *show_thumb;
 
 int main(int argc, char **argv)
 {
+	glutInitWindowSize(1024, 768);
 	glutInit(&argc, argv);
 
 	if(argv[1]) {
 		path = argv[1];
 	}
 
-	glutInitWindowSize(800, 600);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
 	glutCreateWindow("imgthumbs");
 
@@ -81,7 +81,7 @@ static void display(void)
 
 		glScalef(show_zoom, show_zoom, 1);
 		glTranslatef(2.0 * show_pan_x, 2.0 * show_pan_y, 0);
-		if(show_thumb->aspect >= 1.0) {
+		if(show_thumb->aspect >= win_aspect) {
 			glScalef(1, 1.0 / show_thumb->aspect, 1);
 		} else {
 			glScalef(show_thumb->aspect / win_aspect, 1.0 / win_aspect, 1);
