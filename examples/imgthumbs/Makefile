@@ -1,3 +1,6 @@
+# change PREFIX to install elsewhere (default: /usr/local)
+PREFIX = /usr/local
+
 src = $(wildcard src/*.c)
 obj = $(src:.c=.o)
 bin = imgthumbs
@@ -6,9 +9,9 @@ CFLAGS = -pedantic -Wall -g -I../../src
 LDFLAGS = $(libgl) -limago
 
 ifeq ($(shell uname -s), Darwin)
-	libgl = -framework OpenGL -framework GLUT
+	libgl = -framework OpenGL -framework GLUT -lGLEW
 else
-	libgl = -lGL -lGLU -lglut
+	libgl = -lGL -lGLU -lglut -lGLEW
 endif
 
 $(bin): $(obj)
@@ -17,3 +20,12 @@ $(bin): $(obj)
 .PHONY: clean
 clean:
 	rm -f $(obj) $(bin)
+
+.PHONY: install
+install:
+	mkdir -p $(DESTDIR)$(PREFIX)/bin
+	cp $(bin) $(DESTDIR)$(PREFIX)/bin/$(bin)
+
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(bin)

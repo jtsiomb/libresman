@@ -13,6 +13,12 @@ struct thumbnail *create_thumbs(const char *dirpath)
 	struct dirent *dent;
 	struct thumbnail *list = 0;
 
+	unsigned int intfmt = GL_COMPRESSED_RGB;
+	if(!GLEW_ARB_texture_compression) {
+		printf("warning, no texture compression available.\n");
+		intfmt = GL_RGB;
+	}
+
 	if(!(dir = opendir(dirpath))) {
 		fprintf(stderr, "failed to open directory: %s: %s\n", dirpath, strerror(errno));
 		return 0;
@@ -50,7 +56,7 @@ struct thumbnail *create_thumbs(const char *dirpath)
 		glBindTexture(GL_TEXTURE_2D, node->tex);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, xsz, ysz, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+		glTexImage2D(GL_TEXTURE_2D, 0, intfmt, xsz, ysz, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 		img_free_pixels(pixels);
 
 		node->aspect = (float)xsz / (float)ysz;

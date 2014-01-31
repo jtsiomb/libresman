@@ -13,6 +13,7 @@ static void reshape(int x, int y);
 static void keyb(unsigned char key, int x, int y);
 static void mouse(int bn, int st, int x, int y);
 static void motion(int x, int y);
+static void sball_motion(int x, int y, int z);
 static struct thumbnail *find_thumb(int x, int y);
 
 const char *path = ".";
@@ -43,6 +44,7 @@ int main(int argc, char **argv)
 	glutKeyboardFunc(keyb);
 	glutMouseFunc(mouse);
 	glutMotionFunc(motion);
+	glutSpaceballMotionFunc(sball_motion);
 
 	if(init() == -1) {
 		return 1;
@@ -55,6 +57,8 @@ int main(int argc, char **argv)
 
 static int init(void)
 {
+	glewInit();
+
 	thumbs = create_thumbs(path);
 	return 0;
 }
@@ -209,6 +213,26 @@ static void motion(int x, int y)
 		}
 		glutPostRedisplay();
 	}
+}
+
+static void sball_motion(int x, int y, int z)
+{
+	float fx = -x * 0.0004;
+	float fy = z * 0.0004;
+	float fz = -y * 0.0005;
+
+	if(show_thumb) {
+		show_pan_x += fx / show_zoom;
+		show_pan_y += fy / show_zoom;
+		show_zoom += fz;
+		if(show_zoom <= 0) show_zoom = 0;
+	} else {
+		pan_x += fx;
+		pan_y += fy;
+		thumbs_size += fz;
+		if(thumbs_size <= 0.01) thumbs_size = 0.01;
+	}
+	glutPostRedisplay();
 }
 
 static struct thumbnail *find_thumb(int x, int y)
