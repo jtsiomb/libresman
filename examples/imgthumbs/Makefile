@@ -1,0 +1,19 @@
+src = $(wildcard src/*.c)
+obj = $(src:.c=.o)
+bin = imgthumbs
+
+CFLAGS = -pedantic -Wall -g -I../../src
+LDFLAGS = $(libgl) -limago
+
+ifeq ($(shell uname -s), Darwin)
+	libgl = -framework OpenGL -framework GLUT
+else
+	libgl = -lGL -lGLU -lglut
+endif
+
+$(bin): $(obj)
+	$(CC) -o $@ $(obj) $(LDFLAGS)
+
+.PHONY: clean
+clean:
+	rm -f $(obj) $(bin)
