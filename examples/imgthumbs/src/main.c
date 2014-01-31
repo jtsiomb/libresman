@@ -84,7 +84,7 @@ static void display(void)
 		if(show_thumb->aspect >= 1.0) {
 			glScalef(1, 1.0 / show_thumb->aspect, 1);
 		} else {
-			glScalef(show_thumb->aspect, 1, 1);
+			glScalef(show_thumb->aspect / win_aspect, 1.0 / win_aspect, 1);
 		}
 
 		glBegin(GL_QUADS);
@@ -129,7 +129,13 @@ static void keyb(unsigned char key, int x, int y)
 {
 	switch(key) {
 	case 27:
-		exit(0);
+		if(show_thumb) {
+			show_thumb = 0;
+			glutPostRedisplay();
+		} else {
+			exit(0);
+		}
+		break;
 
 	case ' ':
 		show_zoom = 1.0;
