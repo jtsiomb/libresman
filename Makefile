@@ -11,7 +11,9 @@ lib_a = lib$(name).a
 api_major = 0
 api_minor = 1
 
-CFLAGS = -pedantic -Wall -g
+dbg = -g
+
+CFLAGS = -pedantic -Wall $(dbg) $(opt) $(pic)
 
 ifeq ($(shell uname -s), Darwin)
 	lib_so = lib$(name).dylib
