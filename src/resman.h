@@ -12,6 +12,10 @@ typedef void (*resman_destroy_func)(void *data, void *closure);
 
 struct resman;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct resman *resman_create(void);
 void resman_free(struct resman *rman);
 
@@ -30,6 +34,10 @@ int resman_poll(struct resman *rman);
 
 void resman_set_res_data(struct resman *rman, int res_id, void *data);
 void *resman_get_res_data(struct resman *rman, int res_id);
+
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif	/* RESOURCE_MANAGER_H_ */

@@ -7,6 +7,10 @@
 #include "opengl.h"
 #include "thumbs.h"
 
+#ifndef GL_COMPRESSED_RGB
+#define GL_COMPRESSED_RGB	0x84ed
+#endif
+
 struct thumbnail *create_thumbs(const char *dirpath)
 {
 	DIR *dir;
@@ -14,7 +18,7 @@ struct thumbnail *create_thumbs(const char *dirpath)
 	struct thumbnail *list = 0;
 
 	unsigned int intfmt = GL_COMPRESSED_RGB;
-	if(!GLEW_ARB_texture_compression) {
+	if(!strstr(glGetString(GL_EXTENSIONS), "GL_ARB_texture_compression")) {
 		printf("warning, no texture compression available.\n");
 		intfmt = GL_RGB;
 	}

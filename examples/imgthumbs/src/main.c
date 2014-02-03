@@ -57,8 +57,6 @@ int main(int argc, char **argv)
 
 static int init(void)
 {
-	glewInit();
-
 	thumbs = create_thumbs(path);
 	return 0;
 }
