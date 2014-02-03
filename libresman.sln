@@ -1,0 +1,32 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libresman", "libresman.vcproj", "{BCD20CF4-E710-4520-8A51-E29E221D53BA}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libresman-static", "libresman-static.vcproj", "{30D59998-59D6-46D6-ADEC-9C716878317D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imgthumbs", "examples\imgthumbs\imgthumbs.vcproj", "{022D306F-6002-4EAD-ADF5-5B31BB339791}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BCD20CF4-E710-4520-8A51-E29E221D53BA}.Debug|Win32.ActiveCfg = Debug|Win32
+		{BCD20CF4-E710-4520-8A51-E29E221D53BA}.Debug|Win32.Build.0 = Debug|Win32
+		{BCD20CF4-E710-4520-8A51-E29E221D53BA}.Release|Win32.ActiveCfg = Release|Win32
+		{BCD20CF4-E710-4520-8A51-E29E221D53BA}.Release|Win32.Build.0 = Release|Win32
+		{30D59998-59D6-46D6-ADEC-9C716878317D}.Debug|Win32.ActiveCfg = Debug|Win32
+		{30D59998-59D6-46D6-ADEC-9C716878317D}.Debug|Win32.Build.0 = Debug|Win32
+		{30D59998-59D6-46D6-ADEC-9C716878317D}.Release|Win32.ActiveCfg = Release|Win32
+		{30D59998-59D6-46D6-ADEC-9C716878317D}.Release|Win32.Build.0 = Release|Win32
+		{022D306F-6002-4EAD-ADF5-5B31BB339791}.Debug|Win32.ActiveCfg = Debug|Win32
+		{022D306F-6002-4EAD-ADF5-5B31BB339791}.Debug|Win32.Build.0 = Debug|Win32
+		{022D306F-6002-4EAD-ADF5-5B31BB339791}.Release|Win32.ActiveCfg = Release|Win32
+		{022D306F-6002-4EAD-ADF5-5B31BB339791}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

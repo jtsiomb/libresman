@@ -1,0 +1,20 @@
+LIBRARY	"libresman"
+EXPORTS
+	resman_create
+	resman_free
+
+	resman_init
+	resman_destroy
+
+	resman_set_load_func
+	resman_set_create_func
+	resman_set_update_func
+	resman_set_destroy_func
+
+	resman_lookup
+	resman_wait
+
+	resman_poll
+
+	resman_set_res_data
+	resman_get_res_data
