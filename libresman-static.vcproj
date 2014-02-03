@@ -167,6 +167,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\src\threadpool.c"
+				>
+			</File>
+			<File
 				RelativePath=".\src\threadpool.h"
 				>
 			</File>
