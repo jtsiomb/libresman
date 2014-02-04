@@ -117,6 +117,8 @@ static void *thread_func(void *tp)
 		tpool->work_list = tpool->work_list->next;
 
 		tpool->work_func(job->data, tpool->cls);
+
+		free_node(job);
 	}
 	pthread_mutex_unlock(&tpool->work_lock);
 	return 0;
