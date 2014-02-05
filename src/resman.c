@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <pthread.h>
 #include "resman.h"
 #include "dynarr.h"
 #include "threadpool.h"
@@ -9,25 +10,29 @@
 struct resource {
 	char *name;
 	void *data;
+	int result;	/* last callback-reported success/fail code */
+
+	int done_pending;
+	pthread_mutex_t done_lock;
 };
 
 struct resman {
 	struct resource *res;
+	struct thread_pool *tpool;
 
 	resman_load_func load_func;
-	resman_create_func create_func;
-	resman_update_func update_func;
+	resman_done_func done_func;
 	resman_destroy_func destroy_func;
 
 	void *load_func_cls;
-	void *create_func_cls;
-	void *update_func_cls;
+	void *done_func_cls;
 	void *destroy_func_cls;
 };
 
 
 static int find_resource(struct resman *rman, const char *fname);
 static int add_resource(struct resman *rman, const char *fname, void *data);
+static void work_func(void *data, void *cls);
 
 struct resman *resman_create(void)
 {
@@ -49,7 +54,13 @@ int resman_init(struct resman *rman)
 {
 	memset(rman, 0, sizeof *rman);
 
+	if(!(rman->tpool = tpool_create(TPOOL_AUTO))) {
+		return -1;
+	}
+	tpool_set_work_func(rman->tpool, work_func, rman);
+
 	if(!(rman->res = dynarr_alloc(0, sizeof *rman->res))) {
+		tpool_free(rman->tpool);
 		return -1;
 	}
 
@@ -67,6 +78,8 @@ void resman_destroy(struct resman *rman)
 		}
 	}
 	dynarr_free(rman->res);
+
+	tpool_free(rman->tpool);
 }
 
 
@@ -76,16 +89,10 @@ void resman_set_load_func(struct resman *rman, resman_load_func func, void *cls)
 	rman->load_func_cls = cls;
 }
 
-void resman_set_create_func(struct resman *rman, resman_create_func func, void *cls)
+void resman_set_done_func(struct resman *rman, resman_done_func func, void *cls)
 {
-	rman->create_func = func;
-	rman->create_func_cls = cls;
-}
-
-void resman_set_update_func(struct resman *rman, resman_update_func func, void *cls)
-{
-	rman->update_func = func;
-	rman->update_func_cls = cls;
+	rman->done_func = func;
+	rman->done_func_cls = cls;
 }
 
 void resman_set_destroy_func(struct resman *rman, resman_destroy_func func, void *cls)
@@ -113,7 +120,30 @@ void resman_wait(struct resman *rman, int id)
 
 int resman_poll(struct resman *rman)
 {
-	/* TODO */
+	int i, num_res;
+
+	if(!rman->done_func) {
+		return 0;	/* no done callback; there's no point in checking anything */
+	}
+
+	num_res = dynarr_size(rman->res);
+	for(i=0; i<num_res; i++) {
+		struct resource *res = rman->res + i;
+		int last_result;
+
+		pthread_mutex_lock(&res->done_lock);
+		if(!res->done_pending) {
+			pthread_mutex_unlock(&res->done_lock);
+			continue;
+		}
+
+		/* so a done callback *is* pending... */
+		res->done_pending = 0;
+		last_result = res->result;
+		pthread_mutex_unlock(&res->done_lock);
+
+		rman->done_func(last_result, res->data, rman->done_func_cls);
+	}
 	return 0;
 }
 
@@ -131,6 +161,14 @@ void *resman_get_res_data(struct resman *rman, int res_id)
 		return rman->res[res_id].data;
 	}
 	return 0;
+}
+
+int resman_get_res_error(struct resman *rman, int res_id)
+{
+	if(res_id >= 0 && res_id < dynarr_size(rman->res)) {
+		return rman->res[res_id].result;
+	}
+	return -1;
 }
 
 static int find_resource(struct resman *rman, const char *fname)
@@ -160,7 +198,22 @@ static int add_resource(struct resman *rman, const char *fname, void *data)
 
 	rman->res[idx].data = data;
 
-	/* TODO start a loading job ... */
+	/* start a loading job ... */
+	tpool_add_work(rman->tpool, rman->res + idx);
 
 	return idx;
+}
+
+/* this is the background work function which handles all the
+ * first-stage resource loading...
+ */
+static void work_func(void *data, void *cls)
+{
+	struct resource *res = data;
+	struct resman *rman = cls;
+
+	res->result = rman->load_func(res->name, res->data, rman->load_func_cls);
+	pthread_mutex_lock(&res->done_lock);
+	res->done_pending = 1;
+	pthread_mutex_unlock(&res->done_lock);
 }

@@ -69,6 +69,27 @@ void tpool_destroy(struct thread_pool *tpool)
 	pthread_cond_destroy(&tpool->work_cond);
 }
 
+struct thread_pool *tpool_create(int num_threads)
+{
+	struct thread_pool *tpool = malloc(sizeof *tpool);
+	if(!tpool) {
+		return 0;
+	}
+	if(tpool_init(tpool, num_threads) == -1) {
+		free(tpool);
+		return 0;
+	}
+	return tpool;
+}
+
+void tpool_free(struct thread_pool *tpool)
+{
+	if(tpool) {
+		tpool_destroy(tpool);
+		free(tpool);
+	}
+}
+
 void tpool_set_work_func(struct thread_pool *tpool, tpool_work_func func, void *cls)
 {
 	tpool->work_func = func;
