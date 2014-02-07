@@ -37,12 +37,22 @@ int tpool_init(struct thread_pool *tpool, int num_threads)
 
 	memset(tpool, 0, sizeof *tpool);
 
+
+	pthread_mutex_init(&tpool->work_lock, 0);
+	pthread_cond_init(&tpool->work_cond, 0);
+
+
 	if(num_threads <= 0) {
 		num_threads = get_processor_count();
 	}
 	tpool->num_workers = num_threads;
 
 	printf("initializing thread pool with %d worker threads\n", num_threads);
+
+	if(!(tpool->workers = malloc(num_threads * sizeof *tpool->workers))) {
+		fprintf(stderr, "failed to create array of %d threads\n", num_threads);
+		return -1;
+	}
 
 	for(i=0; i<num_threads; i++) {
 		if(pthread_create(tpool->workers + i, 0, thread_func, tpool) == -1) {
@@ -51,9 +61,6 @@ int tpool_init(struct thread_pool *tpool, int num_threads)
 			return -1;
 		}
 	}
-
-	pthread_mutex_init(&tpool->work_lock, 0);
-	pthread_cond_init(&tpool->work_cond, 0);
 	return 0;
 }
 

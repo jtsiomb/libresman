@@ -5,9 +5,9 @@
  * done callback: second-stage callback, called in the context of the
  *                user thread, after the load callback returns
  */
-typedef int (*resman_load_func)(const char *fname, void *data, void *closure);
-typedef int (*resman_done_func)(int result, void *data, void *closure);
-typedef void (*resman_destroy_func)(void *data, void *closure);
+typedef int (*resman_load_func)(const char *fname, int id, void *closure);
+typedef int (*resman_done_func)(int id, void *closure);
+typedef void (*resman_destroy_func)(int id, void *closure);
 
 struct resman;
 
@@ -30,10 +30,12 @@ void resman_wait(struct resman *rman, int id);
 
 int resman_poll(struct resman *rman);
 
+const char *resman_get_res_name(struct resman *rman, int res_id);
+
 void resman_set_res_data(struct resman *rman, int res_id, void *data);
 void *resman_get_res_data(struct resman *rman, int res_id);
 
-int resman_get_res_error(struct resman *rman, int res_id);
+int resman_get_res_result(struct resman *rman, int res_id);
 
 #ifdef __cplusplus
 }

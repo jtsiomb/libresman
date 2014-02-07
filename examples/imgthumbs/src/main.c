@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <imago2.h>
 #include "opengl.h"
 #include "resman.h"
 #include "thumbs.h"
@@ -17,7 +18,6 @@ static void sball_motion(int x, int y, int z);
 static struct thumbnail *find_thumb(int x, int y);
 
 const char *path = ".";
-struct resman *texman;
 int win_width, win_height;
 float win_aspect;
 float pan_x, pan_y;
@@ -40,6 +40,7 @@ int main(int argc, char **argv)
 	glutCreateWindow("imgthumbs");
 
 	glutDisplayFunc(display);
+	glutIdleFunc(glutPostRedisplay);
 	glutReshapeFunc(reshape);
 	glutKeyboardFunc(keyb);
 	glutMouseFunc(mouse);
@@ -68,6 +69,8 @@ static void cleanup(void)
 
 static void display(void)
 {
+	update_thumbs();
+
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	glMatrixMode(GL_MODELVIEW);

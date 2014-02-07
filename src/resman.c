@@ -8,6 +8,7 @@
 #include "threadpool.h"
 
 struct resource {
+	int id;
 	char *name;
 	void *data;
 	int result;	/* last callback-reported success/fail code */
@@ -17,7 +18,7 @@ struct resource {
 };
 
 struct resman {
-	struct resource *res;
+	struct resource **res;
 	struct thread_pool *tpool;
 
 	resman_load_func load_func;
@@ -74,8 +75,9 @@ void resman_destroy(struct resman *rman)
 
 	for(i=0; i<dynarr_size(rman->res); i++) {
 		if(rman->destroy_func) {
-			rman->destroy_func(rman->res[i].data, rman->destroy_func_cls);
+			rman->destroy_func(i, rman->destroy_func_cls);
 		}
+		free(rman->res[i]);
 	}
 	dynarr_free(rman->res);
 
@@ -128,8 +130,7 @@ int resman_poll(struct resman *rman)
 
 	num_res = dynarr_size(rman->res);
 	for(i=0; i<num_res; i++) {
-		struct resource *res = rman->res + i;
-		int last_result;
+		struct resource *res = rman->res[i];
 
 		pthread_mutex_lock(&res->done_lock);
 		if(!res->done_pending) {
@@ -139,34 +140,39 @@ int resman_poll(struct resman *rman)
 
 		/* so a done callback *is* pending... */
 		res->done_pending = 0;
-		last_result = res->result;
+		rman->done_func(i, rman->done_func_cls);
 		pthread_mutex_unlock(&res->done_lock);
-
-		rman->done_func(last_result, res->data, rman->done_func_cls);
 	}
 	return 0;
 }
 
+const char *resman_get_res_name(struct resman *rman, int res_id)
+{
+	if(res_id >= 0 && res_id < dynarr_size(rman->res)) {
+		return rman->res[res_id]->name;
+	}
+	return 0;
+}
 
 void resman_set_res_data(struct resman *rman, int res_id, void *data)
 {
 	if(res_id >= 0 && res_id < dynarr_size(rman->res)) {
-		rman->res[res_id].data = data;
+		rman->res[res_id]->data = data;
 	}
 }
 
 void *resman_get_res_data(struct resman *rman, int res_id)
 {
 	if(res_id >= 0 && res_id < dynarr_size(rman->res)) {
-		return rman->res[res_id].data;
+		return rman->res[res_id]->data;
 	}
 	return 0;
 }
 
-int resman_get_res_error(struct resman *rman, int res_id)
+int resman_get_res_result(struct resman *rman, int res_id)
 {
 	if(res_id >= 0 && res_id < dynarr_size(rman->res)) {
-		return rman->res[res_id].result;
+		return rman->res[res_id]->result;
 	}
 	return -1;
 }
@@ -176,7 +182,7 @@ static int find_resource(struct resman *rman, const char *fname)
 	int i, sz = dynarr_size(rman->res);
 
 	for(i=0; i<sz; i++) {
-		if(strcmp(rman->res[i].name, fname) == 0) {
+		if(strcmp(rman->res[i]->name, fname) == 0) {
 			return i;
 		}
 	}
@@ -186,21 +192,25 @@ static int find_resource(struct resman *rman, const char *fname)
 static int add_resource(struct resman *rman, const char *fname, void *data)
 {
 	int idx = dynarr_size(rman->res);
+	struct resource *res;
+	struct resource **tmparr;
 
-	struct resource *tmp = dynarr_push(rman->res, 0);
-	if(!tmp) {
+	if(!(res = malloc(sizeof *res))) {
 		return -1;
 	}
-	rman->res = tmp;
+	res->id = idx;
+	res->name = strdup(fname);
+	assert(res->name);
+	res->data = data;
 
-	rman->res[idx].name = strdup(fname);
-	assert(rman->res[idx].name);
-
-	rman->res[idx].data = data;
+	if(!(tmparr = dynarr_push(rman->res, &res))) {
+		free(res);
+		return -1;
+	}
+	rman->res = tmparr;
 
 	/* start a loading job ... */
-	tpool_add_work(rman->tpool, rman->res + idx);
-
+	tpool_add_work(rman->tpool, rman->res[idx]);
 	return idx;
 }
 
@@ -212,7 +222,7 @@ static void work_func(void *data, void *cls)
 	struct resource *res = data;
 	struct resman *rman = cls;
 
-	res->result = rman->load_func(res->name, res->data, rman->load_func_cls);
+	res->result = rman->load_func(res->name, res->id, rman->load_func_cls);
 	pthread_mutex_lock(&res->done_lock);
 	res->done_pending = 1;
 	pthread_mutex_unlock(&res->done_lock);

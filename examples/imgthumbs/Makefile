@@ -6,7 +6,7 @@ obj = $(src:.c=.o)
 bin = imgthumbs
 
 CFLAGS = -pedantic -Wall -g -I../../src
-LDFLAGS = $(libgl) -limago
+LDFLAGS = $(libgl) -limago $(resman) -lpthread
 
 ifeq ($(shell uname -s), Darwin)
 	libgl = -framework OpenGL -framework GLUT -lGLEW
@@ -14,8 +14,14 @@ else
 	libgl = -lGL -lGLU -lglut -lGLEW
 endif
 
-$(bin): $(obj)
+resman = ../../libresman.a
+
+$(bin): $(obj) resman
 	$(CC) -o $@ $(obj) $(LDFLAGS)
+
+.PHONY: resman
+resman:
+	$(MAKE) -C ../..
 
 .PHONY: clean
 clean:
