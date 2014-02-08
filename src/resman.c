@@ -132,8 +132,10 @@ int resman_poll(struct resman *rman)
 	for(i=0; i<num_res; i++) {
 		struct resource *res = rman->res[i];
 
+		printf("locking mutex %d\n", res->id);
 		pthread_mutex_lock(&res->done_lock);
 		if(!res->done_pending) {
+			printf("  unlocking mutex %d\n", res->id);
 			pthread_mutex_unlock(&res->done_lock);
 			continue;
 		}
@@ -141,6 +143,7 @@ int resman_poll(struct resman *rman)
 		/* so a done callback *is* pending... */
 		res->done_pending = 0;
 		rman->done_func(i, rman->done_func_cls);
+		printf("  unlocking mutex %d\n", res->id);
 		pthread_mutex_unlock(&res->done_lock);
 	}
 	return 0;
@@ -203,6 +206,8 @@ static int add_resource(struct resman *rman, const char *fname, void *data)
 	assert(res->name);
 	res->data = data;
 
+	pthread_mutex_init(&res->done_lock, 0);
+
 	if(!(tmparr = dynarr_push(rman->res, &res))) {
 		free(res);
 		return -1;
@@ -223,7 +228,10 @@ static void work_func(void *data, void *cls)
 	struct resman *rman = cls;
 
 	res->result = rman->load_func(res->name, res->id, rman->load_func_cls);
+
+	printf("locking mutex %d\n", res->id);
 	pthread_mutex_lock(&res->done_lock);
 	res->done_pending = 1;
+	printf("  unlocking mutex %d\n", res->id);
 	pthread_mutex_unlock(&res->done_lock);
 }

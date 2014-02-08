@@ -67,7 +67,7 @@ struct thumbnail *create_thumbs(const char *dirpath)
 
 		node->aspect = 1.0;/*(float)xsz / (float)ysz;*/
 
-		resman_lookup(texman, node->fname, 0);
+		resman_lookup(texman, node->fname, node);
 
 		/*if(!(pixels = img_load_pixels(node->fname, &xsz, &ysz, IMG_FMT_RGBA32))) {
 			free(node->fname);
@@ -131,11 +131,6 @@ void draw_thumbs(struct thumbnail *thumbs, float thumb_sz, float start_y)
 	glMatrixMode(GL_MODELVIEW);
 
 	while(thumbs) {
-		if(!thumbs->tex) {
-			thumbs = thumbs->next;
-			continue;
-		}
-
 		glPushMatrix();
 		glTranslatef(x, y, 0);
 
@@ -149,27 +144,33 @@ void draw_thumbs(struct thumbnail *thumbs, float thumb_sz, float start_y)
 		glTexCoord2f(0, 1); glVertex2f(0, 1);
 		glEnd();
 
-		if(thumbs->aspect >= 1.0) {
-			glTranslatef(0, 0.5 - 0.5 / thumbs->aspect, 0);
-			glScalef(1, 1.0 / thumbs->aspect, 1);
-		} else {
-			glTranslatef(0.5 - thumbs->aspect / 2.0, 0, 0);
-			glScalef(thumbs->aspect, 1, 1);
+		if(thumbs->tex) {
+			if(thumbs->aspect >= 1.0) {
+				glTranslatef(0, 0.5 - 0.5 / thumbs->aspect, 0);
+				glScalef(1, 1.0 / thumbs->aspect, 1);
+			} else {
+				glTranslatef(0.5 - thumbs->aspect / 2.0, 0, 0);
+				glScalef(thumbs->aspect, 1, 1);
+			}
+
+			if(glIsTexture(thumbs->tex)) {
+				glEnable(GL_TEXTURE_2D);
+				glBindTexture(GL_TEXTURE_2D, thumbs->tex);
+
+				glBegin(GL_QUADS);
+				glColor3f(1, 1, 1);
+				glTexCoord2f(0, 0); glVertex2f(0, 0);
+				glTexCoord2f(1, 0); glVertex2f(1, 0);
+				glTexCoord2f(1, 1); glVertex2f(1, 1);
+				glTexCoord2f(0, 1); glVertex2f(0, 1);
+				glEnd();
+			} else {
+				fprintf(stderr, "invalid texture: %u\n", thumbs->tex);
+			}
+
+			glPopMatrix();
+			glDisable(GL_TEXTURE_2D);
 		}
-
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, thumbs->tex);
-
-		glBegin(GL_QUADS);
-		glColor3f(1, 1, 1);
-		glTexCoord2f(0, 0); glVertex2f(0, 0);
-		glTexCoord2f(1, 0); glVertex2f(1, 0);
-		glTexCoord2f(1, 1); glVertex2f(1, 1);
-		glTexCoord2f(0, 1); glVertex2f(0, 1);
-		glEnd();
-
-		glPopMatrix();
-		glDisable(GL_TEXTURE_2D);
 
 		thumbs->layout_pos[0] = x;
 		thumbs->layout_pos[1] = y;
@@ -192,8 +193,7 @@ void draw_thumbs(struct thumbnail *thumbs, float thumb_sz, float start_y)
 
 static int load_res_texture(const char *fname, int id, void *cls)
 {
-	struct resman *rman = cls;
-	struct thumbnail *rdata = resman_get_res_data(rman, id);
+	struct thumbnail *rdata = resman_get_res_data(texman, id);
 
 	assert(rdata);
 	if(!rdata->img) {
@@ -202,7 +202,7 @@ static int load_res_texture(const char *fname, int id, void *cls)
 		}
 	}
 
-	if(!img_load(rdata->img, fname) == -1) {
+	if(img_load(rdata->img, fname) == -1) {
 		img_free(rdata->img);
 		return -1;
 	}
@@ -210,21 +210,20 @@ static int load_res_texture(const char *fname, int id, void *cls)
 
 	/* set the resource's data to the loaded image, so that we can use
 	 * it in the done callback */
-	resman_set_res_data(rman, id, rdata);
+	resman_set_res_data(texman, id, rdata);
 	return 0;
 }
 
 static int done_res_texture(int id, void *cls)
 {
 	struct thumbnail *rdata;
-	struct resman *rman = cls;
 
-	rdata = resman_get_res_data(rman, id);
+	rdata = resman_get_res_data(texman, id);
 
-	if(resman_get_res_result(rman, id) != 0 || !rdata) {
-		fprintf(stderr, "failed to load resource %d (%s)\n", id, resman_get_res_name(rman, id));
+	if(resman_get_res_result(texman, id) != 0 || !rdata) {
+		fprintf(stderr, "failed to load resource %d (%s)\n", id, resman_get_res_name(texman, id));
 	} else {
-		printf("done loading resource %d (%s)\n", id, resman_get_res_name(rman, id));
+		printf("done loading resource %d (%s)\n", id, resman_get_res_name(texman, id));
 	}
 
 	if(!rdata->tex) {
@@ -241,8 +240,7 @@ static int done_res_texture(int id, void *cls)
 
 static void free_res_texture(int id, void *cls)
 {
-	struct resman *rman = cls;
-	struct thumbnail *rdata = resman_get_res_data(rman, id);
+	struct thumbnail *rdata = resman_get_res_data(texman, id);
 
 	if(rdata) {
 		if(rdata->tex) {

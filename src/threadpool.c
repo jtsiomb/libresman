@@ -122,8 +122,10 @@ int tpool_add_work(struct thread_pool *tpool, void *data)
 		tpool->work_list_tail->next = node;
 		tpool->work_list_tail = node;
 	}
-
 	pthread_mutex_unlock(&tpool->work_lock);
+
+	/* wakeup all threads, there's work to do */
+	pthread_cond_broadcast(&tpool->work_cond);
 	return 0;
 }
 
