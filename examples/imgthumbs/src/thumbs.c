@@ -24,7 +24,8 @@ struct thumbnail *create_thumbs(const char *dirpath)
 {
 	DIR *dir;
 	struct dirent *dent;
-	struct thumbnail *list = 0;
+	/* allocate dummy head node */
+	struct thumbnail *list = calloc(1, sizeof *list);
 
 	/*unsigned int intfmt = GL_COMPRESSED_RGB;
 	if(!strstr((char*)glGetString(GL_EXTENSIONS), "GL_ARB_texture_compression")) {
@@ -85,8 +86,8 @@ struct thumbnail *create_thumbs(const char *dirpath)
 		img_free_pixels(pixels);
 		*/
 
-		node->next = list;
-		list = node;
+		node->next = list->next;
+		node->prev = list;
 	}
 	closedir(dir);
 
@@ -130,6 +131,7 @@ void draw_thumbs(struct thumbnail *thumbs, float thumb_sz, float start_y)
 
 	glMatrixMode(GL_MODELVIEW);
 
+	thumbs = thumbs->next;	/* skip dummy node */
 	while(thumbs) {
 		glPushMatrix();
 		glTranslatef(x, y, 0);
@@ -204,6 +206,7 @@ static int load_res_texture(const char *fname, int id, void *cls)
 
 	if(img_load(rdata->img, fname) == -1) {
 		img_free(rdata->img);
+		rdata->img = 0;
 		return -1;
 	}
 	rdata->aspect = (float)rdata->img->width / (float)rdata->img->height;
@@ -216,9 +219,16 @@ static int load_res_texture(const char *fname, int id, void *cls)
 
 static int done_res_texture(int id, void *cls)
 {
-	struct thumbnail *rdata;
+	struct thumbnail *rdata = resman_get_res_data(texman, id);
+	int load_result = resman_get_res_result(texman, id);
 
-	rdata = resman_get_res_data(texman, id);
+	if(load_result == -1) {
+		/* returning -1 will remove this resource, the free_res_texture
+		 * destroy handler will be called, which will remove the node
+		 * from the list
+		 */
+		return -1;
+	}
 
 	if(resman_get_res_result(texman, id) != 0 || !rdata) {
 		fprintf(stderr, "failed to load resource %d (%s)\n", id, resman_get_res_name(texman, id));
@@ -240,14 +250,23 @@ static int done_res_texture(int id, void *cls)
 
 static void free_res_texture(int id, void *cls)
 {
-	struct thumbnail *rdata = resman_get_res_data(texman, id);
+	struct thumbnail *thumb = resman_get_res_data(texman, id);
 
-	if(rdata) {
-		if(rdata->tex) {
-			glDeleteTextures(1, &rdata->tex);
+	if(thumb) {
+		if(thumb->tex) {
+			glDeleteTextures(1, &thumb->tex);
 		}
-		if(rdata->img) {
-			img_free(rdata->img);
+		if(thumb->img) {
+			img_free(thumb->img);
 		}
 	}
+
+	/* remove from the list */
+	if(thumb->prev) {
+		thumb->prev->next = thumb->next;
+	}
+	if(thumb->next) {
+		thumb->next->prev = thumb->prev;
+	}
+	free(thumb);
 }

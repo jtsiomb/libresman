@@ -21,6 +21,8 @@ struct resman {
 	struct resource **res;
 	struct thread_pool *tpool;
 
+	pthread_mutex_t lock;	/* global resman lock (for res array changes) */
+
 	resman_load_func load_func;
 	resman_done_func done_func;
 	resman_destroy_func destroy_func;
@@ -33,6 +35,7 @@ struct resman {
 
 static int find_resource(struct resman *rman, const char *fname);
 static int add_resource(struct resman *rman, const char *fname, void *data);
+static void remove_resource(struct resman *rman, int idx);
 static void work_func(void *data, void *cls);
 
 struct resman *resman_create(void)
@@ -65,6 +68,8 @@ int resman_init(struct resman *rman)
 		return -1;
 	}
 
+	pthread_mutex_init(&rman->lock, 0);
+
 	return 0;
 }
 
@@ -82,6 +87,8 @@ void resman_destroy(struct resman *rman)
 	dynarr_free(rman->res);
 
 	tpool_free(rman->tpool);
+
+	pthread_mutex_destroy(&rman->lock);
 }
 
 
@@ -131,6 +138,9 @@ int resman_poll(struct resman *rman)
 	num_res = dynarr_size(rman->res);
 	for(i=0; i<num_res; i++) {
 		struct resource *res = rman->res[i];
+		if(!res) {
+			continue;
+		}
 
 		printf("locking mutex %d\n", res->id);
 		pthread_mutex_lock(&res->done_lock);
@@ -142,7 +152,13 @@ int resman_poll(struct resman *rman)
 
 		/* so a done callback *is* pending... */
 		res->done_pending = 0;
-		rman->done_func(i, rman->done_func_cls);
+		if(rman->done_func(i, rman->done_func_cls) == -1) {
+			/* done-func returned -1, so let's remove the resource */
+			printf("  unlocking mutex %d\n", res->id);
+			pthread_mutex_unlock(&res->done_lock);
+			remove_resource(rman, i);
+			continue;
+		}
 		printf("  unlocking mutex %d\n", res->id);
 		pthread_mutex_unlock(&res->done_lock);
 	}
@@ -194,29 +210,62 @@ static int find_resource(struct resman *rman, const char *fname)
 
 static int add_resource(struct resman *rman, const char *fname, void *data)
 {
-	int idx = dynarr_size(rman->res);
+	int i, idx = -1, size = dynarr_size(rman->res);
 	struct resource *res;
 	struct resource **tmparr;
 
+	/* allocate a new resource */
 	if(!(res = malloc(sizeof *res))) {
 		return -1;
 	}
-	res->id = idx;
+	memset(res, 0, sizeof *res);
+
 	res->name = strdup(fname);
 	assert(res->name);
 	res->data = data;
-
 	pthread_mutex_init(&res->done_lock, 0);
 
-	if(!(tmparr = dynarr_push(rman->res, &res))) {
-		free(res);
-		return -1;
+
+	/* check to see if there's an emtpy (previously erased) slot */
+	for(i=0; i<size; i++) {
+		if(!rman->res[i]) {
+			idx = i;
+			break;
+		}
 	}
-	rman->res = tmparr;
+
+	if(idx == -1) {
+		/* free slot not found, append a new one */
+		idx = size;
+
+		if(!(tmparr = dynarr_push(rman->res, &res))) {
+			free(res);
+			return -1;
+		}
+		rman->res = tmparr;
+	} else {
+		/* free slot found, just use it */
+		res = rman->res[idx];
+	}
+
+	res->id = idx;	/* set the resource id */
 
 	/* start a loading job ... */
 	tpool_add_work(rman->tpool, rman->res[idx]);
 	return idx;
+}
+
+/* remove a resource and leave the pointer null to reuse the slot */
+static void remove_resource(struct resman *rman, int idx)
+{
+	if(rman->destroy_func) {
+		rman->destroy_func(idx, rman->destroy_func_cls);
+	}
+
+	pthread_mutex_destroy(&rman->res[idx]->done_lock);
+
+	free(rman->res[idx]);
+	rman->res[idx] = 0;
 }
 
 /* this is the background work function which handles all the
@@ -228,6 +277,11 @@ static void work_func(void *data, void *cls)
 	struct resman *rman = cls;
 
 	res->result = rman->load_func(res->name, res->id, rman->load_func_cls);
+	if(res->result == -1 && !rman->done_func) {
+		/* if there's no done function and we got an error, remove the resource now */
+		remove_resource(rman, res->id);
+		return;
+	}
 
 	printf("locking mutex %d\n", res->id);
 	pthread_mutex_lock(&res->done_lock);

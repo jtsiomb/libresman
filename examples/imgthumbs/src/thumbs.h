@@ -13,7 +13,7 @@ struct thumbnail {
 
 	struct img_pixmap *img;
 
-	struct thumbnail *next;
+	struct thumbnail *next, *prev;
 };
 
 struct thumbnail *create_thumbs(const char *dirpath);
