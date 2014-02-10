@@ -14,6 +14,7 @@ struct resource {
 	int result;	/* last callback-reported success/fail code */
 
 	int done_pending;
+	int delete_pending;
 	pthread_mutex_t done_lock;
 };
 
@@ -56,9 +57,16 @@ void resman_free(struct resman *rman)
 
 int resman_init(struct resman *rman)
 {
+	const char *env;
+	int num_threads = TPOOL_AUTO;
+
 	memset(rman, 0, sizeof *rman);
 
-	if(!(rman->tpool = tpool_create(TPOOL_AUTO))) {
+	if((env = getenv("RESMAN_THREADS"))) {
+		num_threads = atoi(env);
+	}
+
+	if(!(rman->tpool = tpool_create(num_threads))) {
 		return -1;
 	}
 	tpool_set_work_func(rman->tpool, work_func, rman);
@@ -131,11 +139,27 @@ int resman_poll(struct resman *rman)
 {
 	int i, num_res;
 
+	/* first check all the resources to see if any is pending deletion */
+	num_res = dynarr_size(rman->res);
+	for(i=0; i<num_res; i++) {
+		struct resource *res = rman->res[i];
+		if(!res) {
+			continue;
+		}
+
+		if(res->delete_pending) {
+			if(rman->destroy_func) {
+				rman->destroy_func(i, rman->destroy_func_cls);
+			}
+			remove_resource(rman, i);
+		}
+	}
+
+
 	if(!rman->done_func) {
 		return 0;	/* no done callback; there's no point in checking anything */
 	}
 
-	num_res = dynarr_size(rman->res);
 	for(i=0; i<num_res; i++) {
 		struct resource *res = rman->res[i];
 		if(!res) {
@@ -278,8 +302,10 @@ static void work_func(void *data, void *cls)
 
 	res->result = rman->load_func(res->name, res->id, rman->load_func_cls);
 	if(res->result == -1 && !rman->done_func) {
-		/* if there's no done function and we got an error, remove the resource now */
-		remove_resource(rman, res->id);
+		/* if there's no done function and we got an error, mark this
+		 * resource for deletion in the caller context
+		 */
+		res->delete_pending = 1;
 		return;
 	}
 

@@ -14,6 +14,7 @@
 #endif
 
 struct resman *texman;
+struct thumbnail *dbg;
 
 static int load_res_texture(const char *fname, int id, void *cls);
 static int done_res_texture(int id, void *cls);
@@ -26,6 +27,7 @@ struct thumbnail *create_thumbs(const char *dirpath)
 	struct dirent *dent;
 	/* allocate dummy head node */
 	struct thumbnail *list = calloc(1, sizeof *list);
+	dbg = list;
 
 	/*unsigned int intfmt = GL_COMPRESSED_RGB;
 	if(!strstr((char*)glGetString(GL_EXTENSIONS), "GL_ARB_texture_compression")) {
@@ -88,6 +90,7 @@ struct thumbnail *create_thumbs(const char *dirpath)
 
 		node->next = list->next;
 		node->prev = list;
+		list->next = node;
 	}
 	closedir(dir);
 
@@ -122,7 +125,7 @@ void draw_thumbs(struct thumbnail *thumbs, float thumb_sz, float start_y)
 	float view_aspect;
 
 	glGetIntegerv(GL_VIEWPORT, vp);
-	view_aspect = (float)(vp[2] - vp[0]) / (vp[3] - vp[1]);
+	view_aspect = (float)(vp[2] - vp[0]) / (float)(vp[3] - vp[1]);
 
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
@@ -133,6 +136,7 @@ void draw_thumbs(struct thumbnail *thumbs, float thumb_sz, float start_y)
 
 	thumbs = thumbs->next;	/* skip dummy node */
 	while(thumbs) {
+		printf("drawing thumb: %s\n", thumbs->fname);
 		glPushMatrix();
 		glTranslatef(x, y, 0);
 
@@ -251,6 +255,8 @@ static int done_res_texture(int id, void *cls)
 static void free_res_texture(int id, void *cls)
 {
 	struct thumbnail *thumb = resman_get_res_data(texman, id);
+
+	printf("deleting thumb %d: %s\n", id, thumb->fname);
 
 	if(thumb) {
 		if(thumb->tex) {
