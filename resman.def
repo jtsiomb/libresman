@@ -7,8 +7,7 @@ EXPORTS
 	resman_destroy
 
 	resman_set_load_func
-	resman_set_create_func
-	resman_set_update_func
+	resman_set_done_func
 	resman_set_destroy_func
 
 	resman_lookup
@@ -16,5 +15,7 @@ EXPORTS
 
 	resman_poll
 
+	resman_get_res_name
 	resman_set_res_data
 	resman_get_res_data
+	resman_get_res_result

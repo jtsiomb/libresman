@@ -9,6 +9,8 @@
 #include "thumbs.h"
 #include "resman.h"
 
+#define DBG_SYNC
+
 #ifndef GL_COMPRESSED_RGB
 #define GL_COMPRESSED_RGB	0x84ed
 #endif
@@ -27,12 +29,6 @@ struct thumbnail *create_thumbs(const char *dirpath)
 	/* allocate dummy head node */
 	struct thumbnail *list = calloc(1, sizeof *list);
 
-	/*unsigned int intfmt = GL_COMPRESSED_RGB;
-	if(!strstr((char*)glGetString(GL_EXTENSIONS), "GL_ARB_texture_compression")) {
-		printf("warning, no texture compression available.\n");
-		intfmt = GL_RGB;
-	}*/
-
 	if(!texman) {
 		texman = resman_create();
 		resman_set_load_func(texman, load_res_texture, 0);
@@ -46,8 +42,10 @@ struct thumbnail *create_thumbs(const char *dirpath)
 	}
 
 	while((dent = readdir(dir))) {
-		/*int xsz, ysz;
-		unsigned char *pixels;*/
+#ifdef DBG_SYNC
+		int xsz, ysz;
+		unsigned char *pixels;
+#endif
 		struct thumbnail *node;
 
 		if(!(node = malloc(sizeof *node))) {
@@ -66,11 +64,12 @@ struct thumbnail *create_thumbs(const char *dirpath)
 		}
 		strcat(node->fname, dent->d_name);
 
-		node->aspect = 1.0;/*(float)xsz / (float)ysz;*/
+		node->aspect = 1.0;
 
+#ifndef DBG_SYNC
 		resman_lookup(texman, node->fname, node);
-
-		/*if(!(pixels = img_load_pixels(node->fname, &xsz, &ysz, IMG_FMT_RGBA32))) {
+#else
+		if(!(pixels = img_load_pixels(node->fname, &xsz, &ysz, IMG_FMT_RGBA32))) {
 			free(node->fname);
 			free(node);
 			continue;
@@ -82,9 +81,11 @@ struct thumbnail *create_thumbs(const char *dirpath)
 		glBindTexture(GL_TEXTURE_2D, node->tex);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexImage2D(GL_TEXTURE_2D, 0, intfmt, xsz, ysz, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, xsz, ysz, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 		img_free_pixels(pixels);
-		*/
+
+		node->aspect = (float)xsz / (float)ysz;
+#endif
 
 		node->next = list->next;
 		node->prev = list;

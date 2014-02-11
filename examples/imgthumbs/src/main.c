@@ -9,7 +9,7 @@
 static int init(void);
 static void cleanup(void);
 static void display(void);
-/*static void idle(void);*/
+static void idle(void);
 static void reshape(int x, int y);
 static void keyb(unsigned char key, int x, int y);
 static void mouse(int bn, int st, int x, int y);
@@ -40,7 +40,7 @@ int main(int argc, char **argv)
 	glutCreateWindow("imgthumbs");
 
 	glutDisplayFunc(display);
-	glutIdleFunc(glutPostRedisplay);
+	glutIdleFunc(idle);
 	glutReshapeFunc(reshape);
 	glutKeyboardFunc(keyb);
 	glutMouseFunc(mouse);
@@ -105,12 +105,10 @@ static void display(void)
 	assert(glGetError() == GL_NO_ERROR);
 }
 
-/*
 static void idle(void)
 {
 	glutPostRedisplay();
 }
-*/
 
 static void reshape(int x, int y)
 {
