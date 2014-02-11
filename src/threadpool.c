@@ -5,6 +5,7 @@
 #include "threadpool.h"
 
 struct work_item {
+	int id;	/* just for debugging messages */
 	void *data;
 	struct work_item *next;
 };
@@ -106,6 +107,7 @@ void tpool_set_work_func(struct thread_pool *tpool, tpool_work_func func, void *
 int tpool_add_work(struct thread_pool *tpool, void *data)
 {
 	struct work_item *node;
+	static int jcounter;
 
 	if(!(node = alloc_node())) {
 		fprintf(stderr, "%s: failed to allocate new work item node\n", __FUNCTION__);
@@ -115,6 +117,9 @@ int tpool_add_work(struct thread_pool *tpool, void *data)
 	node->next = 0;
 
 	pthread_mutex_lock(&tpool->work_lock);
+	node->id = jcounter++;
+
+	printf("TPOOL: adding work item: %d\n", node->id);
 
 	if(!tpool->work_list) {
 		tpool->work_list = tpool->work_list_tail = node;
@@ -132,8 +137,17 @@ int tpool_add_work(struct thread_pool *tpool, void *data)
 
 static void *thread_func(void *tp)
 {
+	int i, tidx = -1;
 	struct work_item *job;
 	struct thread_pool *tpool = tp;
+	pthread_t tid = pthread_self();
+
+	for(i=0; i<tpool->num_workers; i++) {
+		if(tpool[i].workers[i] == tid) {
+			tidx = i;
+			break;
+		}
+	}
 
 	pthread_mutex_lock(&tpool->work_lock);
 	for(;;) {
@@ -143,11 +157,14 @@ static void *thread_func(void *tp)
 			continue;	/* spurious wakeup, go back to sleep */
 		}
 
+		printf("TPOOL: worker %d start job: %d\n", tidx, job->id);
+
 		job = tpool->work_list;
 		tpool->work_list = tpool->work_list->next;
 
 		tpool->work_func(job->data, tpool->cls);
 
+		printf("TPOOL: worker %d completed job: %d\n", tidx, job->id);
 		free_node(job);
 	}
 	pthread_mutex_unlock(&tpool->work_lock);
