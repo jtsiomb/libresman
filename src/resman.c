@@ -166,10 +166,8 @@ int resman_poll(struct resman *rman)
 			continue;
 		}
 
-		printf("locking mutex %d\n", res->id);
 		pthread_mutex_lock(&res->done_lock);
 		if(!res->done_pending) {
-			printf("  unlocking mutex %d\n", res->id);
 			pthread_mutex_unlock(&res->done_lock);
 			continue;
 		}
@@ -178,12 +176,10 @@ int resman_poll(struct resman *rman)
 		res->done_pending = 0;
 		if(rman->done_func(i, rman->done_func_cls) == -1) {
 			/* done-func returned -1, so let's remove the resource */
-			printf("  unlocking mutex %d\n", res->id);
 			pthread_mutex_unlock(&res->done_lock);
 			remove_resource(rman, i);
 			continue;
 		}
-		printf("  unlocking mutex %d\n", res->id);
 		pthread_mutex_unlock(&res->done_lock);
 	}
 	return 0;
@@ -309,9 +305,7 @@ static void work_func(void *data, void *cls)
 		return;
 	}
 
-	printf("locking mutex %d\n", res->id);
 	pthread_mutex_lock(&res->done_lock);
 	res->done_pending = 1;
-	printf("  unlocking mutex %d\n", res->id);
 	pthread_mutex_unlock(&res->done_lock);
 }

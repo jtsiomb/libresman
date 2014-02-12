@@ -9,19 +9,12 @@
 #include "thumbs.h"
 #include "resman.h"
 
-#undef DBG_SYNC
-
-#ifndef GL_COMPRESSED_RGB
-#define GL_COMPRESSED_RGB	0x84ed
-#endif
-
-struct resman *texman;
-struct thumbnail *dbg;
-
 static int load_res_texture(const char *fname, int id, void *cls);
 static int done_res_texture(int id, void *cls);
 static void free_res_texture(int id, void *cls);
 
+struct resman *texman;
+int dbg_load_async = 1;
 
 struct thumbnail *create_thumbs(const char *dirpath)
 {
@@ -29,7 +22,6 @@ struct thumbnail *create_thumbs(const char *dirpath)
 	struct dirent *dent;
 	/* allocate dummy head node */
 	struct thumbnail *list = calloc(1, sizeof *list);
-	dbg = list;
 
 	if(!texman) {
 		texman = resman_create();
@@ -44,9 +36,7 @@ struct thumbnail *create_thumbs(const char *dirpath)
 	}
 
 	while((dent = readdir(dir))) {
-#ifdef DBG_SYNC
 		struct img_pixmap img;
-#endif
 		struct thumbnail *node;
 
 		if(!(node = malloc(sizeof *node))) {
@@ -67,32 +57,34 @@ struct thumbnail *create_thumbs(const char *dirpath)
 
 		node->aspect = 1.0;
 
-#ifndef DBG_SYNC
-		resman_lookup(texman, node->fname, node);
-#else
-		img_init(&img);
-		if(img_load(&img, node->fname) == -1) {
+		if(dbg_load_async) {
+			resman_lookup(texman, node->fname, node);
+		} else {
+			img_init(&img);
+			if(img_load(&img, node->fname) == -1) {
+				img_destroy(&img);
+				free(node->fname);
+				free(node);
+				continue;
+			}
+
+			printf("loaded image: %s\n", node->fname);
+
+			node->aspect = (float)img.width / (float)img.height;
+
+			glGenTextures(1, &node->tex);
+			glBindTexture(GL_TEXTURE_2D, node->tex);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexImage2D(GL_TEXTURE_2D, 0, img_glintfmt(&img), img.width, img.height, 0, img_glfmt(&img), img_gltype(&img), img.pixels);
 			img_destroy(&img);
-			free(node->fname);
-			free(node);
-			continue;
+
+			node->prev = list;
+			node->next = list->next;
+			if(list->next) list->next->prev = node;
+			list->next = node;
 		}
-
-		printf("loaded image: %s\n", node->fname);
-
-		node->aspect = (float)img.width / (float)img.height;
-
-		glGenTextures(1, &node->tex);
-		glBindTexture(GL_TEXTURE_2D, node->tex);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexImage2D(GL_TEXTURE_2D, 0, img_glintfmt(&img), img.width, img.height, 0, img_glfmt(&img), img_gltype(&img), img.pixels);
-		img_destroy(&img);
-#endif
-
-		node->next = list->next;
-		node->prev = list;
-		list->next = node;
+		node->list = list;
 	}
 	closedir(dir);
 
@@ -138,7 +130,6 @@ void draw_thumbs(struct thumbnail *thumbs, float thumb_sz, float start_y)
 
 	thumbs = thumbs->next;	/* skip dummy node */
 	while(thumbs) {
-		printf("drawing thumb: %s\n", thumbs->fname);
 		glPushMatrix();
 		glTranslatef(x, y, 0);
 
@@ -225,7 +216,7 @@ static int load_res_texture(const char *fname, int id, void *cls)
 
 static int done_res_texture(int id, void *cls)
 {
-	struct thumbnail *rdata = resman_get_res_data(texman, id);
+	struct thumbnail *thumb = resman_get_res_data(texman, id);
 	int load_result = resman_get_res_result(texman, id);
 
 	if(load_result == -1) {
@@ -236,21 +227,27 @@ static int done_res_texture(int id, void *cls)
 		return -1;
 	}
 
-	if(resman_get_res_result(texman, id) != 0 || !rdata) {
+	if(resman_get_res_result(texman, id) != 0 || !thumb) {
 		fprintf(stderr, "failed to load resource %d (%s)\n", id, resman_get_res_name(texman, id));
 	} else {
 		printf("done loading resource %d (%s)\n", id, resman_get_res_name(texman, id));
 	}
 
-	if(!rdata->tex) {
-		glGenTextures(1, &rdata->tex);
+	if(!thumb->tex) {
+		glGenTextures(1, &thumb->tex);
 	}
-	glBindTexture(GL_TEXTURE_2D, rdata->tex);
+	glBindTexture(GL_TEXTURE_2D, thumb->tex);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, img_glintfmt(rdata->img),
-			rdata->img->width, rdata->img->height, 0, img_glfmt(rdata->img),
-			img_gltype(rdata->img), rdata->img->pixels);
+	glTexImage2D(GL_TEXTURE_2D, 0, img_glintfmt(thumb->img),
+			thumb->img->width, thumb->img->height, 0, img_glfmt(thumb->img),
+			img_gltype(thumb->img), thumb->img->pixels);
+
+	/* and add it to the list of thumbnails */
+	thumb->prev = thumb->list;
+	thumb->next = thumb->list->next;
+	if(thumb->list->next) thumb->list->next->prev = thumb;
+	thumb->list->next = thumb;
 	return 0;
 }
 

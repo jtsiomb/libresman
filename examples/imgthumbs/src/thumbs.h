@@ -14,6 +14,7 @@ struct thumbnail {
 	struct img_pixmap *img;
 
 	struct thumbnail *next, *prev;
+	struct thumbnail *list;	/* pointer to the list this thumbnail belongs to */
 };
 
 struct thumbnail *create_thumbs(const char *dirpath);
