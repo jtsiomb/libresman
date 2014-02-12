@@ -9,7 +9,7 @@
 #include "thumbs.h"
 #include "resman.h"
 
-#define DBG_SYNC
+#undef DBG_SYNC
 
 #ifndef GL_COMPRESSED_RGB
 #define GL_COMPRESSED_RGB	0x84ed
@@ -45,8 +45,7 @@ struct thumbnail *create_thumbs(const char *dirpath)
 
 	while((dent = readdir(dir))) {
 #ifdef DBG_SYNC
-		int xsz, ysz;
-		unsigned char *pixels;
+		struct img_pixmap img;
 #endif
 		struct thumbnail *node;
 
@@ -71,7 +70,9 @@ struct thumbnail *create_thumbs(const char *dirpath)
 #ifndef DBG_SYNC
 		resman_lookup(texman, node->fname, node);
 #else
-		if(!(pixels = img_load_pixels(node->fname, &xsz, &ysz, IMG_FMT_RGBA32))) {
+		img_init(&img);
+		if(img_load(&img, node->fname) == -1) {
+			img_destroy(&img);
 			free(node->fname);
 			free(node);
 			continue;
@@ -79,14 +80,14 @@ struct thumbnail *create_thumbs(const char *dirpath)
 
 		printf("loaded image: %s\n", node->fname);
 
+		node->aspect = (float)img.width / (float)img.height;
+
 		glGenTextures(1, &node->tex);
 		glBindTexture(GL_TEXTURE_2D, node->tex);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, xsz, ysz, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-		img_free_pixels(pixels);
-
-		node->aspect = (float)xsz / (float)ysz;
+		glTexImage2D(GL_TEXTURE_2D, 0, img_glintfmt(&img), img.width, img.height, 0, img_glfmt(&img), img_gltype(&img), img.pixels);
+		img_destroy(&img);
 #endif
 
 		node->next = list->next;

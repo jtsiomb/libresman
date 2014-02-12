@@ -17,6 +17,9 @@ struct thread_pool {
 	pthread_mutex_t work_lock;
 	pthread_cond_t work_cond;
 
+	int start;
+	pthread_cond_t start_cond;
+
 	tpool_work_func work_func;
 	void *cls;
 
@@ -55,6 +58,9 @@ int tpool_init(struct thread_pool *tpool, int num_threads)
 		return -1;
 	}
 
+	/* this start condvar is pretty useless */
+	pthread_cond_init(&tpool->start_cond, 0);
+
 	for(i=0; i<num_threads; i++) {
 		if(pthread_create(tpool->workers + i, 0, thread_func, tpool) == -1) {
 			fprintf(stderr, "%s: failed to create thread %d\n", __FUNCTION__, i);
@@ -62,6 +68,8 @@ int tpool_init(struct thread_pool *tpool, int num_threads)
 			return -1;
 		}
 	}
+	tpool->start = 1;
+	pthread_cond_broadcast(&tpool->start_cond);
 	return 0;
 }
 
@@ -142,8 +150,15 @@ static void *thread_func(void *tp)
 	struct thread_pool *tpool = tp;
 	pthread_t tid = pthread_self();
 
+	/* wait for the start signal :) */
+	pthread_mutex_lock(&tpool->work_lock);
+	while(!tpool->start) {
+		pthread_cond_wait(&tpool->start_cond, &tpool->work_lock);
+	}
+	pthread_mutex_unlock(&tpool->work_lock);
+
 	for(i=0; i<tpool->num_workers; i++) {
-		if(tpool[i].workers[i] == tid) {
+		if(pthread_equal(tpool->workers[i], tid)) {
 			tidx = i;
 			break;
 		}
@@ -157,13 +172,11 @@ static void *thread_func(void *tp)
 			continue;	/* spurious wakeup, go back to sleep */
 		}
 
-		printf("TPOOL: worker %d start job: %d\n", tidx, job->id);
-
 		job = tpool->work_list;
 		tpool->work_list = tpool->work_list->next;
 
+		printf("TPOOL: worker %d start job: %d\n", tidx, job->id);
 		tpool->work_func(job->data, tpool->cls);
-
 		printf("TPOOL: worker %d completed job: %d\n", tidx, job->id);
 		free_node(job);
 	}
