@@ -15,6 +15,8 @@ struct thumbnail {
 
 	struct thumbnail *next, *prev;
 	struct thumbnail *list;	/* pointer to the list this thumbnail belongs to */
+
+	int load_count;
 };
 
 struct thumbnail *create_thumbs(const char *dirpath);

@@ -164,23 +164,28 @@ static void *thread_func(void *tp)
 		}
 	}
 
-	pthread_mutex_lock(&tpool->work_lock);
 	for(;;) {
+		int job_id;
+		void *data;
+
+		pthread_mutex_lock(&tpool->work_lock);
 		/* while there aren't any work items to do go to sleep on the condvar */
-		pthread_cond_wait(&tpool->work_cond, &tpool->work_lock);
-		if(!tpool->work_list) {
-			continue;	/* spurious wakeup, go back to sleep */
+		while(!tpool->work_list) {
+			pthread_cond_wait(&tpool->work_cond, &tpool->work_lock);
 		}
 
 		job = tpool->work_list;
 		tpool->work_list = tpool->work_list->next;
 
-		printf("TPOOL: worker %d start job: %d\n", tidx, job->id);
-		tpool->work_func(job->data, tpool->cls);
-		printf("TPOOL: worker %d completed job: %d\n", tidx, job->id);
+		job_id = job->id;
+		data = job->data;
 		free_node(job);
+		pthread_mutex_unlock(&tpool->work_lock);
+
+		printf("TPOOL: worker %d start job: %d\n", tidx, job_id);
+		tpool->work_func(data, tpool->cls);
+		printf("TPOOL: worker %d completed job: %d\n", tidx, job_id);
 	}
-	pthread_mutex_unlock(&tpool->work_lock);
 	return 0;
 }
 

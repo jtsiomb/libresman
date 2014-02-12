@@ -37,6 +37,8 @@ void *resman_get_res_data(struct resman *rman, int res_id);
 
 int resman_get_res_result(struct resman *rman, int res_id);
 
+int resman_get_res_load_count(struct resman *rman, int res_id);
+
 #ifdef __cplusplus
 }
 #endif

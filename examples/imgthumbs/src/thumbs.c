@@ -22,6 +22,11 @@ struct thumbnail *create_thumbs(const char *dirpath)
 	struct dirent *dent;
 	/* allocate dummy head node */
 	struct thumbnail *list = calloc(1, sizeof *list);
+	char *env;
+
+	if((env = getenv("RESMAN_LOAD_ASYNC"))) {
+		dbg_load_async = atoi(env);
+	}
 
 	if(!texman) {
 		texman = resman_create();
@@ -85,6 +90,7 @@ struct thumbnail *create_thumbs(const char *dirpath)
 			list->next = node;
 		}
 		node->list = list;
+		node->load_count = 0;
 	}
 	closedir(dir);
 
@@ -243,11 +249,13 @@ static int done_res_texture(int id, void *cls)
 			thumb->img->width, thumb->img->height, 0, img_glfmt(thumb->img),
 			img_gltype(thumb->img), thumb->img->pixels);
 
-	/* and add it to the list of thumbnails */
-	thumb->prev = thumb->list;
-	thumb->next = thumb->list->next;
-	if(thumb->list->next) thumb->list->next->prev = thumb;
-	thumb->list->next = thumb;
+	/* and add it to the list of thumbnails (if it's the first loading) */
+	if(resman_get_res_load_count(texman, id) == 0) {
+		thumb->prev = thumb->list;
+		thumb->next = thumb->list->next;
+		if(thumb->list->next) thumb->list->next->prev = thumb;
+		thumb->list->next = thumb;
+	}
 	return 0;
 }
 

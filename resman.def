@@ -19,3 +19,4 @@ EXPORTS
 	resman_set_res_data
 	resman_get_res_data
 	resman_get_res_result
+	resman_get_res_load_count
