@@ -28,7 +28,6 @@ struct resource {
 
 	/* file change monitoring */
 #ifdef WIN32
-	HANDLE nhandle;
 	char *watch_path;
 #endif
 #ifdef __linux__
@@ -58,8 +57,8 @@ struct resman {
 	struct rbtree *modset;
 #endif
 #ifdef WIN32
-	struct rbtree *watchdirs;
-	HANDLE *watch_handles;	/* dynamic array of all the watch handles */
+	struct rbtree *watchdirs, *wdirbyev;
+	HANDLE *watch_handles;	/* dynamic array of all the watched directory handles */
 #endif
 };
 
