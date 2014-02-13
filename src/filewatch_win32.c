@@ -2,110 +2,171 @@
 #ifdef WIN32
 #include <stdio.h>
 #include <assert.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/inotify.h>
+#include <malloc.h>
 #include "filewatch.h"
 #include "resman.h"
 #include "resman_impl.h"
+#include "dynarr.h"
+
+struct watch_dir {
+	HANDLE handle;
+	int nref;
+};
 
 static void reload_modified(struct rbnode *node, void *cls);
 
 int resman_init_file_monitor(struct resman *rman)
 {
-	int fd;
-
-	if((fd = inotify_init()) == -1) {
+	if(!(rman->watch_handles = dynarr_alloc(0, sizeof *rman->watch_handles))) {
 		return -1;
 	}
-	/* set non-blocking flag, to allow polling by reading */
-	fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
-	rman->inotify_fd = fd;
 
-	/* create the fd->resource map */
-	rman->nresmap = rb_create(RB_KEY_INT);
-	/* create the modified set */
-	rman->modset = rb_create(RB_KEY_INT);
+	/* create the handle->resource map */
+	rman->nresmap = rb_create(RB_KEY_ADDR);
+	/* create the watched dirs set */
+	rman->watchdirs = rb_create(RB_KEY_STRING);
 	return 0;
 }
 
 void resman_destroy_file_monitor(struct resman *rman)
 {
-	rb_free(rman->nresmap);
-	rb_free(rman->modset);
+	dynarr_free(rman->watch_handles);
 
-	if(rman->inotify_fd >= 0) {
-		close(rman->inotify_fd);
-		rman->inotify_fd = -1;
-	}
+	rb_free(rman->nresmap);
+	rb_free(rman->watchdirs);
 }
 
 int resman_start_watch(struct resman *rman, struct resource *res)
 {
-	int fd;
+	char *path;
+	HANDLE handle;
+	struct watch_dir *wdir;
 
-	if((fd = inotify_add_watch(rman->inotify_fd, res->name, IN_MODIFY)) == -1) {
-		return -1;
+	/* construct an absolute path for the directory containing this file */
+	path = res->name;
+	if(path[0] != '/' && path[1] != ':') {	/* not an absolute path */
+		char *src, *dest, *lastslash;
+		int cwdsz = GetCurrentDirectory(0, 0);
+		int pathsz = strlen(path) + cwdsz + 1;
+
+		path = malloc(pathsz + 1);
+		GetCurrentDirectory(pathsz, path);
+
+		/* now copy the rest of the path, until the last slash, while converting path separators */
+		src = res->name;
+		dest = path + strlen(path);
+
+		lastslash = dest;
+		*dest++ = '\\';
+		while(*src) {
+			if(src[-1] == '\\') {
+				/* skip any /./ parts of the path */
+				if(src[0] == '.' && (src[1] == '/' || src[1] == '\\')) {
+					src += 2;
+					continue;
+				}
+				/* normalize any /../ parts of the path */
+				if(src[0] == '.' && src[1] == '.' && (src[2] == '/' || src[2] == '\\')) {
+					src += 3;
+					dest = strrchr(src - 2, '\\');
+					assert(dest);
+					dest++;
+					continue;
+				}
+			}
+
+			if(*src == '/' || *src == '\\') {
+				lastslash = dest;
+				*dest++ = '\\';
+				src++;
+			} else {
+				*dest++ = *src++;
+			}
+		}
+
+		*lastslash = 0;
 	}
-	printf("started watching file \"%s\" for modification (fd %d)\n", res->name, fd);
-	rb_inserti(rman->nresmap, fd, res);
 
-	res->nfd = fd;
+	/* check to see if we already have a watch handle for this directory */
+	if((wdir = rb_find(rman->watchdirs, path))) {
+		handle = wdir->handle;
+		wdir->nref++;
+	} else {
+		if(!(wdir = malloc(sizeof *wdir))) {
+			perror("failed to allocate watchdir");
+			free(path);
+			return -1;
+		}
+
+		/* otherwise start a new notification */
+		if((handle = FindFirstChangeNotification(path, FALSE, FILE_NOTIFY_CHANGE_LAST_WRITE)) == INVALID_HANDLE_VALUE) {
+			unsigned int err = GetLastError();
+			fprintf(stderr, "failed to watch %s for modification (error: %u)\n", path, err);
+			free(wdir);
+			free(path);
+			return -1;
+		}
+		wdir->handle = handle;
+		wdir->nref = 1;
+
+		rb_insert(rman->watchdirs, path, wdir);
+		dynarr_push(rman->watch_handles, &handle);
+	}
+
+	rb_insert(rman->nresmap, handle, res);
+	res->nhandle = handle;
+	res->watch_path = path;
 	return 0;
 }
 
 void resman_stop_watch(struct resman *rman, struct resource *res)
 {
-	if(res->nfd > 0) {
-		rb_deletei(rman->nresmap, res->nfd);
-		inotify_rm_watch(rman->inotify_fd, res->nfd);
+	int i, sz;
+
+	if(res->nhandle) {
+		struct watch_dir *wdir = rb_find(rman->watchdirs, res->watch_path);
+		if(wdir) {
+			if(--wdir->nref <= 0) {
+				FindCloseChangeNotification(res->nhandle);
+
+				/* find the handle in the watch_handles array and remove it */
+				sz = dynarr_size(rman->watch_handles);
+				for(i=0; i<sz; i++) {
+					if(rman->watch_handles[i] == res->nhandle) {
+						/* swap the end for it and pop */
+						rman->watch_handles[i] = rman->watch_handles[sz - 1];
+						rman->watch_handles[sz - 1] = 0;
+						dynarr_pop(rman->watch_handles);
+						break;
+					}
+				}
+			}
+			free(wdir);
+		}
+
+		rb_delete(rman->nresmap, res->nhandle);
+		res->nhandle = 0;
 	}
 }
 
 void resman_check_watch(struct resman *rman)
 {
-	char buf[512];
-	struct inotify_event *ev;
-	int sz, evsize;
-
-	while((sz = read(rman->inotify_fd, buf, sizeof buf)) > 0) {
-		ev = (struct inotify_event*)buf;
-		while(sz > 0) {
-			if(ev->mask & IN_MODIFY) {
-				/* add the file descriptor to the modified set */
-				rb_inserti(rman->modset, ev->wd, 0);
-			}
-
-			evsize = sizeof *ev + ev->len;
-			sz -= evsize;
-			ev += evsize;
+	unsigned int num_handles = dynarr_size(rman->watch_handles);
+	for(;;) {
+		struct resource *res;
+		unsigned int idx = WaitForMultipleObjects(num_handles, rman->watch_handles, FALSE, 0);
+		if(idx < WAIT_OBJECT_0 || idx >= WAIT_OBJECT_0 + num_handles) {
+			break;
 		}
+
+		if(!(res = rb_find(rman->nresmap, rman->watch_handles[idx]))) {
+			fprintf(stderr, "got modification event from unknown resource!\n");
+			continue;
+		}
+
+		printf("file \"%s\" modified\n", res->name);
+		tpool_add_work(rman->tpool, res);
 	}
-
-	/* for each item in the modified set, start a new job to reload it */
-	rb_foreach(rman->modset, reload_modified, rman);
-	rb_clear(rman->modset);
-}
-
-/* this is called for each item in the modified set (see above) */
-static void reload_modified(struct rbnode *node, void *cls)
-{
-	int watch_fd;
-	struct resource *res;
-	struct resman *rman = cls;
-
-	watch_fd = rb_node_keyi(node);
-
-	if(!(res = rb_findi(rman->nresmap, watch_fd))) {
-		fprintf(stderr, "%s: can't find resource for watch descriptor: %d\n",
-				__FUNCTION__, watch_fd);
-		return;
-	}
-	assert(watch_fd == res->nfd);
-
-	printf("file \"%s\" modified (fd %d)\n", res->name, rb_node_keyi(node));
-
-	tpool_add_work(rman->tpool, res);
 }
 
 #else

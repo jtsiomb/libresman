@@ -21,7 +21,7 @@
 			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="2"
-			CharacterSet="1"
+			CharacterSet="2"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -95,7 +95,7 @@
 			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="2"
-			CharacterSet="1"
+			CharacterSet="2"
 			WholeProgramOptimization="1"
 			>
 			<Tool
@@ -185,11 +185,35 @@
 				>
 			</File>
 			<File
+				RelativePath=".\src\filewatch.h"
+				>
+			</File>
+			<File
+				RelativePath=".\src\filewatch_linux.c"
+				>
+			</File>
+			<File
+				RelativePath=".\src\filewatch_win32.c"
+				>
+			</File>
+			<File
+				RelativePath=".\src\rbtree.c"
+				>
+			</File>
+			<File
+				RelativePath=".\src\rbtree.h"
+				>
+			</File>
+			<File
 				RelativePath=".\src\resman.c"
 				>
 			</File>
 			<File
 				RelativePath=".\src\resman.h"
+				>
+			</File>
+			<File
+				RelativePath=".\src\resman_impl.h"
 				>
 			</File>
 			<File

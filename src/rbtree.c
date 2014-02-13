@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef _MSC_VER
 #include <stdint.h>
+#endif
 #include <string.h>
 #include "rbtree.h"
 
@@ -414,7 +416,7 @@ static struct rbnode *rot_right(struct rbnode *a)
 
 static struct rbnode *find_min(struct rbnode *tree)
 {
-	struct rbnode *node;
+	struct rbnode *node = tree;
 
 	if(!tree)
 		return 0;

@@ -10,6 +10,9 @@
 #include <fcntl.h>
 #include <sys/inotify.h>
 #endif
+#ifdef WIN32
+#include <windows.h>
+#endif
 
 struct resource {
 	int id;
@@ -24,8 +27,9 @@ struct resource {
 	int num_loads;		/* number of loads up to now */
 
 	/* file change monitoring */
-#ifdef __WIN32__
+#ifdef WIN32
 	HANDLE nhandle;
+	char *watch_path;
 #endif
 #ifdef __linux__
 	int nfd;
@@ -49,9 +53,13 @@ struct resman {
 
 	/* file change monitoring */
 	struct rbtree *nresmap;
-	struct rbtree *modset;
 #ifdef __linux__
 	int inotify_fd;
+	struct rbtree *modset;
+#endif
+#ifdef WIN32
+	struct rbtree *watchdirs;
+	HANDLE *watch_handles;	/* dynamic array of all the watch handles */
 #endif
 };
 

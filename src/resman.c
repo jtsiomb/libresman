@@ -313,9 +313,7 @@ static void work_func(void *data, void *cls)
 			}
 		} else {
 			/* succeded, start a watch */
-			if(res->nfd <= 0) {
-				resman_start_watch(rman, res);
-			}
+			resman_start_watch(rman, res);
 		}
 	} else {
 		/* if we have a done_func, mark this resource as done */

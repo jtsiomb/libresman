@@ -44,6 +44,10 @@ int resman_start_watch(struct resman *rman, struct resource *res)
 {
 	int fd;
 
+	if(res->nfd > 0) {
+		return 0;	/* already started a watch for this resource */
+	}
+
 	if((fd = inotify_add_watch(rman->inotify_fd, res->name, IN_MODIFY)) == -1) {
 		return -1;
 	}
