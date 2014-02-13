@@ -209,9 +209,6 @@ static void handle_event(struct resman *rman, HANDLE hev, struct watch_dir *wdir
 
 	for(;;) {
 		if(info->Action == FILE_ACTION_MODIFIED) {
-			/*printf("file \"%s\" modified\n", res->name);
-			tpool_add_work(rman->tpool, res);*/
-
 			char *name;
 			int len = info->FileNameLength / 2;
 			wchar_t *wname = alloca((len + 1) * sizeof *wname);
@@ -221,8 +218,6 @@ static void handle_event(struct resman *rman, HANDLE hev, struct watch_dir *wdir
 			len = wcstombs(0, wname, 0);
 			name = alloca(len + 1);
 			wcstombs(name, wname, len + 1);
-
-			printf("MODIFIED: \"%s\"\n", name);
 
 			witem = wdir->items;
 			while(witem) {
