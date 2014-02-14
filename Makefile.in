@@ -1,6 +1,3 @@
-# change this if you want to install elsewhere
-PREFIX = /usr/local
-
 src = $(wildcard src/*.c)
 obj = $(src:.c=.o)
 dep = $(obj:.o=.d)
@@ -10,8 +7,6 @@ lib_a = lib$(name).a
 
 api_major = 0
 api_minor = 1
-
-dbg = -g
 
 CFLAGS = -pedantic -Wall $(dbg) $(opt) $(pic)
 

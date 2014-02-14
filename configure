@@ -1,5 +1,9 @@
 #!/bin/sh
 
+prefix=/usr/local
+optimize=false
+debugsym=true
+
 for arg in "$@"; do
 	case "$arg" in
 	--prefix=*)
