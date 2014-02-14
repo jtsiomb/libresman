@@ -76,6 +76,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				CommandLine="mkdir usr\include&#x0D;&#x0A;mkdir usr\lib&#x0D;&#x0A;mkdir usr\bin&#x0D;&#x0A;copy /Y src\resman.h usr\include\&#x0D;&#x0A;copy /Y $(TargetDir)$(TargetName).dll usr\bin\$(TargetName)-dbg.dll&#x0D;&#x0A;copy /Y $(TargetDir)$(TargetName).lib usr\lib\$(TargetName)-dbg.lib"
 			/>
 		</Configuration>
 		<Configuration
@@ -139,6 +140,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				CommandLine="mkdir usr\include&#x0D;&#x0A;mkdir usr\lib&#x0D;&#x0A;mkdir usr\bin&#x0D;&#x0A;copy /Y src\resman.h usr\include\&#x0D;&#x0A;copy /Y $(TargetDir)$(TargetName).dll usr\bin\$(TargetName).dll&#x0D;&#x0A;copy /Y $(TargetDir)$(TargetName).lib usr\lib\$(TargetName).lib"
 			/>
 		</Configuration>
 	</Configurations>
