@@ -249,7 +249,7 @@ static void handle_event(struct resman *rman, HANDLE hev, struct watch_dir *wdir
 			} else {
 				/* found the resource, schedule a reload */
 				printf("file \"%s\" modified\n", res->name);
-				tpool_add_work(rman->tpool, res);
+				resman_reload(rman, res);
 			}
 		}
 

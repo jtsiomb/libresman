@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <pthread.h>
 #include "rbtree.h"
-#include "threadpool.h"
+#include "tpool.h"
 
 #ifdef __linux__
 #include <unistd.h>
@@ -30,6 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifdef WIN32
 #include <windows.h>
 #endif
+
+struct work_item;
 
 struct resource {
 	int id;
@@ -77,7 +79,12 @@ struct resman {
 	struct rbtree *watchdirs, *wdirbyev;
 	HANDLE *watch_handles;	/* dynamic array of all the watched directory handles */
 #endif
+
+	/* list of free work item structures for the work item allocatro */
+	struct work_item *work_items;
 };
+
+void resman_reload(struct resman *rman, struct resource *res);
 
 
 #endif	/* RESMAN_IMPL_H_ */

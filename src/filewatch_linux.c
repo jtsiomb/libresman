@@ -126,7 +126,7 @@ static void reload_modified(struct rbnode *node, void *cls)
 
 	printf("file \"%s\" modified (fd %d)\n", res->name, rb_node_keyi(node));
 
-	tpool_add_work(rman->tpool, res);
+	resman_reload(rman, res);
 }
 
 #else

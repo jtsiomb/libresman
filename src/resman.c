@@ -25,12 +25,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "dynarr.h"
 #include "filewatch.h"
 
+struct work_item {
+	struct resman *rman;
+	struct resource *res;
+
+	struct work_item *next;
+};
+
 
 static int find_resource(struct resman *rman, const char *fname);
 static int add_resource(struct resman *rman, const char *fname, void *data);
 static void remove_resource(struct resman *rman, int idx);
-static void work_func(void *data, void *cls);
-
+static void work_func(void *cls);
+/* these two functions should only be called with the resman mutex locked */
+static struct work_item *alloc_work_item(struct resman *rman);
+static void free_work_item(struct resman *rman, struct work_item *w);
 
 struct resman *resman_create(void)
 {
@@ -51,7 +60,7 @@ void resman_free(struct resman *rman)
 int resman_init(struct resman *rman)
 {
 	const char *env;
-	int num_threads = TPOOL_AUTO;
+	int num_threads = 0;	/* automatically determine number of threads */
 
 	memset(rman, 0, sizeof *rman);
 
@@ -66,10 +75,9 @@ int resman_init(struct resman *rman)
 	if(!(rman->tpool = tpool_create(num_threads))) {
 		return -1;
 	}
-	tpool_set_work_func(rman->tpool, work_func, rman);
 
 	if(!(rman->res = dynarr_alloc(0, sizeof *rman->res))) {
-		tpool_free(rman->tpool);
+		tpool_destroy(rman->tpool);
 		return -1;
 	}
 
@@ -91,7 +99,7 @@ void resman_destroy(struct resman *rman)
 	}
 	dynarr_free(rman->res);
 
-	tpool_free(rman->tpool);
+	tpool_destroy(rman->tpool);
 
 	resman_destroy_file_monitor(rman);
 
@@ -288,9 +296,21 @@ static int add_resource(struct resman *rman, const char *fname, void *data)
 
 	res->id = idx;	/* set the resource id */
 
-	/* start a loading job ... */
-	tpool_add_work(rman->tpool, rman->res[idx]);
+	resman_reload(rman, rman->res[idx]);
 	return idx;
+}
+
+void resman_reload(struct resman *rman, struct resource *res)
+{
+	struct work_item *work;
+
+	/* start a loading job ... */
+	pthread_mutex_lock(&rman->lock);
+	work = alloc_work_item(rman);
+	pthread_mutex_unlock(&rman->lock);
+	work->res = res;
+
+	tpool_enqueue(rman->tpool, work, work_func, 0);
 }
 
 /* remove a resource and leave the pointer null to reuse the slot */
@@ -311,12 +331,14 @@ static void remove_resource(struct resman *rman, int idx)
 /* this is the background work function which handles all the
  * first-stage resource loading...
  */
-static void work_func(void *data, void *cls)
+static void work_func(void *cls)
 {
-	struct resource *res = data;
-	struct resman *rman = cls;
+	struct work_item *work = cls;
+	struct resource *res = work->res;
+	struct resman *rman = work->rman;
 
 	pthread_mutex_lock(&res->lock);
+	free_work_item(rman, work);
 
 	res->result = rman->load_func(res->name, res->id, rman->load_func_cls);
 	if(!rman->done_func) {
@@ -337,4 +359,27 @@ static void work_func(void *data, void *cls)
 		res->done_pending = 1;
 	}
 	pthread_mutex_unlock(&res->lock);
+}
+
+static struct work_item *alloc_work_item(struct resman *rman)
+{
+	struct work_item *res;
+
+	if(rman->work_items) {
+		res = rman->work_items;
+		rman->work_items = res->next;
+	} else {
+		if(!(res = malloc(sizeof *res))) {
+			perror("failed to allocate resman work item");
+			abort();
+		}
+		res->rman = rman;
+	}
+	return res;
+}
+
+static void free_work_item(struct resman *rman, struct work_item *w)
+{
+	w->next = rman->work_items;
+	rman->work_items = w;
 }
