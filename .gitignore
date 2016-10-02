@@ -3,6 +3,7 @@
 *.d
 libresman.so*
 libresman.a
+libresman.dylib
 *.jpg
 *.png
 *.gif

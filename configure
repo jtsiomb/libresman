@@ -3,6 +3,7 @@
 prefix=/usr/local
 optimize=false
 debugsym=true
+watch=true
 
 for arg in "$@"; do
 	case "$arg" in
@@ -20,6 +21,11 @@ for arg in "$@"; do
 	--disable-debug)
 		debugsym=false;;
 
+	--enable-watch)
+		watch=true;;
+	--disable-watch)
+		watch=false;;
+
 	--help)
 		echo 'usage: ./configure [options]'
 		echo 'options:'
@@ -28,6 +34,8 @@ for arg in "$@"; do
 		echo '  --disable-opt: disable optimizations'
 		echo '  --enable-debug: include debugging symbols'
 		echo '  --disable-debug: do not include debugging symbols'
+		echo '  --enable-watch: build with file modification watching module'
+		echo '  --disable-watch: do not build file modification watching'
 		echo 'all invalid options are silently ignored'
 		exit 0
 		;;
@@ -45,6 +53,9 @@ if $optimize; then
 fi
 if $debugsym; then
 	echo 'dbg = -g' >>Makefile
+fi
+if ! $watch; then
+	echo 'watch = -DNOWATCH' >>Makefile
 fi
 
 cat Makefile.in >>Makefile

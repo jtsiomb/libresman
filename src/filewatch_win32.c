@@ -1,6 +1,6 @@
 /*
 libresman - a multithreaded resource data file manager.
-Copyright (C) 2014  John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2014-2016  John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -16,7 +16,7 @@ You should have received a copy of the GNU Lesser General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 /* file modification monitoring for windows */
-#ifdef WIN32
+#if !defined(NOWATCH) && defined(WIN32)
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
