@@ -1,15 +1,13 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libresman", "libresman.vcproj", "{BCD20CF4-E710-4520-8A51-E29E221D53BA}"
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.40629.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libresman", "libresman.vcxproj", "{BCD20CF4-E710-4520-8A51-E29E221D53BA}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libresman-static", "libresman-static.vcproj", "{30D59998-59D6-46D6-ADEC-9C716878317D}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libresman-static", "libresman-static.vcxproj", "{30D59998-59D6-46D6-ADEC-9C716878317D}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imgthumbs", "examples\imgthumbs\imgthumbs.vcproj", "{022D306F-6002-4EAD-ADF5-5B31BB339791}"
-	ProjectSection(ProjectDependencies) = postProject
-		{30D59998-59D6-46D6-ADEC-9C716878317D} = {30D59998-59D6-46D6-ADEC-9C716878317D}
-		{BCD20CF4-E710-4520-8A51-E29E221D53BA} = {BCD20CF4-E710-4520-8A51-E29E221D53BA}
-	EndProjectSection
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imgthumbs", "examples\imgthumbs\imgthumbs.vcxproj", "{022D306F-6002-4EAD-ADF5-5B31BB339791}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

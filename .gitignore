@@ -18,3 +18,10 @@ libresman.dylib
 *.rgba
 Makefile
 imgthumbs
+*sdf
+*.suo
+Debug/
+Release/
+Debug-static/
+Release-static/
+usr/
