@@ -151,7 +151,7 @@ int resman_poll(struct resman *rman)
 	int i, num_res;
 	unsigned int start_time;
 
-	/* first check all the resources to see if any is pending deletion */
+	/* first check all the resources to see if anyone is pending deletion */
 	num_res = dynarr_size(rman->res);
 	for(i=0; i<num_res; i++) {
 		struct resource *res = rman->res[i];

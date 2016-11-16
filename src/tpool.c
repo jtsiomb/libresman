@@ -1,12 +1,27 @@
-/* worker thread pool based on POSIX threads
- * author: John Tsiombikas <nuclear@member.fsf.org>
- * This code is public domain.
- */
+/*
+libresman - a multithreaded resource data file manager.
+Copyright (C) 2014-2016  John Tsiombikas <nuclear@member.fsf.org>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#ifndef WIN32
 #include <unistd.h>
 #include <sys/time.h>
+#endif
 #include <pthread.h>
 #include "tpool.h"
 
@@ -58,7 +73,7 @@ struct thread_pool *tpool_create(int num_threads)
 	}
 	for(i=0; i<num_threads; i++) {
 		if(pthread_create(tpool->threads + i, 0, thread_func, tpool) == -1) {
-			tpool->threads[i] = 0;
+			/*tpool->threads[i] = 0;*/
 			tpool_destroy(tpool);
 			return 0;
 		}
@@ -196,6 +211,8 @@ void tpool_wait_one(struct thread_pool *tpool)
 	pthread_mutex_unlock(&tpool->workq_mutex);
 }
 
+/* TODO: implement for win32 */
+#ifndef WIN32
 long tpool_timedwait(struct thread_pool *tpool, long timeout)
 {
 	struct timespec tout_ts;
@@ -218,6 +235,7 @@ long tpool_timedwait(struct thread_pool *tpool, long timeout)
 	gettimeofday(&tv, 0);
 	return (tv.tv_sec - tv0.tv_sec) * 1000 + (tv.tv_usec - tv0.tv_usec) / 1000;
 }
+#endif
 
 static void *thread_func(void *args)
 {

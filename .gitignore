@@ -3,6 +3,7 @@
 *.d
 libresman.so*
 libresman.a
+libresman.dylib
 *.jpg
 *.png
 *.gif
@@ -17,3 +18,10 @@ libresman.a
 *.rgba
 Makefile
 imgthumbs
+*sdf
+*.suo
+Debug/
+Release/
+Debug-static/
+Release-static/
+usr/

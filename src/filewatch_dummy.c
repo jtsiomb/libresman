@@ -15,19 +15,31 @@ GNU Lesser General Public License for more details.
 You should have received a copy of the GNU Lesser General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef DYNARR_H_
-#define DYNARR_H_
+#ifdef NOWATCH
+#include "resman_impl.h"
 
-void *dynarr_alloc(int elem, int szelem);
-void dynarr_free(void *da);
-void *dynarr_resize(void *da, int elem);
+int resman_init_file_monitor(struct resman *rman)
+{
+	return 0;
+}
 
-int dynarr_empty(void *da);
-int dynarr_size(void *da);
+void resman_destroy_file_monitor(struct resman *rman)
+{
+}
 
-/* stack semantics */
-void *dynarr_push(void *da, void *item);
-void *dynarr_pop(void *da);
+int resman_start_watch(struct resman *rman, struct resource *res)
+{
+	return 0;
+}
 
+void resman_stop_watch(struct resman *rman, struct resource *res)
+{
+}
 
-#endif	/* DYNARR_H_ */
+void resman_check_watch(struct resman *rman)
+{
+}
+
+#else
+int resman_filewatch_dummy_silence_empty_file_warning;
+#endif
