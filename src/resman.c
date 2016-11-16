@@ -1,6 +1,6 @@
 /*
 libresman - a multithreaded resource data file manager.
-Copyright (C) 2014  John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2014-2016  John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "resman_impl.h"
 #include "dynarr.h"
 #include "filewatch.h"
+#include "timer.h"
 
 struct work_item {
 	struct resman *rman;
@@ -66,6 +67,9 @@ int resman_init(struct resman *rman)
 
 	if((env = getenv("RESMAN_THREADS"))) {
 		num_threads = atoi(env);
+	}
+	if(num_threads < 1) {
+		num_threads = tpool_num_processors() - 1;
 	}
 
 	if(resman_init_file_monitor(rman) == -1) {
@@ -145,6 +149,7 @@ void resman_wait(struct resman *rman, int id)
 int resman_poll(struct resman *rman)
 {
 	int i, num_res;
+	unsigned int start_time;
 
 	/* first check all the resources to see if any is pending deletion */
 	num_res = dynarr_size(rman->res);
@@ -170,6 +175,8 @@ int resman_poll(struct resman *rman)
 	if(!rman->done_func) {
 		return 0;	/* no done callback; there's no point in checking anything */
 	}
+
+	start_time = resman_get_time_msec();
 
 	for(i=0; i<num_res; i++) {
 		struct resource *res = rman->res[i];
@@ -200,6 +207,13 @@ int resman_poll(struct resman *rman)
 
 		resman_start_watch(rman, res);	/* start watching the file for modifications */
 		pthread_mutex_unlock(&res->lock);
+
+		/* poll will be called with a high frequency anyway, so let's not spend
+		 * too much time on done callbacks each time through it
+		 */
+		if(resman_get_time_msec() - start_time > 16) {
+			break;
+		}
 	}
 	return 0;
 }
@@ -339,8 +353,11 @@ static void work_func(void *cls)
 
 	pthread_mutex_lock(&res->lock);
 	free_work_item(rman, work);
+	pthread_mutex_unlock(&res->lock);
 
 	res->result = rman->load_func(res->name, res->id, rman->load_func_cls);
+
+	pthread_mutex_lock(&res->lock);
 	if(!rman->done_func) {
 		if(res->result == -1) {
 			/* if there's no done function and we got an error, mark this
