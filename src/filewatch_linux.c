@@ -118,8 +118,7 @@ static void reload_modified(struct rbnode *node, void *cls)
 	watch_fd = rb_node_keyi(node);
 
 	if(!(res = rb_findi(rman->nresmap, watch_fd))) {
-		fprintf(stderr, "%s: can't find resource for watch descriptor: %d\n",
-				__FUNCTION__, watch_fd);
+		fprintf(stderr, "reload_modified: can't find resource for watch descriptor: %d\n", watch_fd);
 		return;
 	}
 	assert(watch_fd == res->nfd);
