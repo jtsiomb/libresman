@@ -31,6 +31,10 @@ extern "C" {
 struct thread_pool *tpool_create(int num_threads);
 void tpool_destroy(struct thread_pool *tpool);
 
+/* optional reference counting interface for thread pool sharing */
+int tpool_addref(struct thread_pool *tpool);
+int tpool_release(struct thread_pool *tpool);	/* will tpool_destroy on nref 0 */
+
 /* if begin_batch is called before an enqueue, the worker threads will not be
  * signalled to start working until end_batch is called.
  */

@@ -46,6 +46,8 @@ struct thread_pool {
 
 	int should_quit;
 	int in_batch;
+
+	int nref;	/* reference count */
 };
 
 static void *thread_func(void *args);
@@ -107,6 +109,20 @@ void tpool_destroy(struct thread_pool *tpool)
 	pthread_mutex_destroy(&tpool->workq_mutex);
 	pthread_cond_destroy(&tpool->workq_condvar);
 	pthread_cond_destroy(&tpool->done_condvar);
+}
+
+int tpool_addref(struct thread_pool *tpool)
+{
+	return ++tpool->nref;
+}
+
+int tpool_release(struct thread_pool *tpool)
+{
+	if(--tpool->nref <= 0) {
+		tpool_destroy(tpool);
+		return 0;
+	}
+	return tpool->nref;
 }
 
 void tpool_begin_batch(struct thread_pool *tpool)

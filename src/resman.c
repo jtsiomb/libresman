@@ -42,6 +42,10 @@ static void work_func(void *cls);
 static struct work_item *alloc_work_item(struct resman *rman);
 static void free_work_item(struct resman *rman, struct work_item *w);
 
+
+static struct thread_pool *thread_pool;
+
+
 struct resman *resman_create(void)
 {
 	struct resman *rman = malloc(sizeof *rman);
@@ -61,32 +65,36 @@ void resman_free(struct resman *rman)
 int resman_init(struct resman *rman)
 {
 	const char *env;
-	int num_threads = 0;	/* automatically determine number of threads */
+
+	if(!thread_pool) {
+		/* create the thread pool if there isn't one */
+		int num_threads = 0;	/* automatically determine number of threads */
+		if((env = getenv("RESMAN_THREADS"))) {
+			num_threads = atoi(env);
+		}
+		if(num_threads < 1) {
+			if((num_threads = tpool_num_processors() - 1) < 1) {
+				num_threads = 1;
+			}
+		}
+		if(!(thread_pool = tpool_create(num_threads))) {
+			return -1;
+		}
+	}
+	tpool_addref(thread_pool);
 
 	memset(rman, 0, sizeof *rman);
-
-	if((env = getenv("RESMAN_THREADS"))) {
-		num_threads = atoi(env);
-	}
-	if(num_threads < 1) {
-		num_threads = tpool_num_processors() - 1;
-	}
+	rman->tpool = thread_pool;
 
 	if(resman_init_file_monitor(rman) == -1) {
 		return -1;
 	}
 
-	if(!(rman->tpool = tpool_create(num_threads))) {
-		return -1;
-	}
-
 	if(!(rman->res = dynarr_alloc(0, sizeof *rman->res))) {
-		tpool_destroy(rman->tpool);
 		return -1;
 	}
 
 	pthread_mutex_init(&rman->lock, 0);
-
 	return 0;
 }
 
@@ -103,7 +111,7 @@ void resman_destroy(struct resman *rman)
 	}
 	dynarr_free(rman->res);
 
-	tpool_destroy(rman->tpool);
+	tpool_release(rman->tpool);
 
 	resman_destroy_file_monitor(rman);
 
