@@ -56,7 +56,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRESMAN_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader />
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
@@ -84,7 +84,7 @@ copy /Y $(TargetDir)$(TargetName).lib usr\lib\$(TargetName)-dbg.lib</Command>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBRESMAN_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeader />
       <WarningLevel>Level3</WarningLevel>
@@ -112,10 +112,12 @@ copy /Y $(TargetDir)$(TargetName).lib usr\lib\$(TargetName).lib</Command>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\dynarr.c" />
+    <ClCompile Include="src\filewatch_dummy.c" />
     <ClCompile Include="src\filewatch_linux.c" />
     <ClCompile Include="src\filewatch_win32.c" />
     <ClCompile Include="src\rbtree.c" />
     <ClCompile Include="src\resman.c" />
+    <ClCompile Include="src\timer.c" />
     <ClCompile Include="src\tpool.c" />
   </ItemGroup>
   <ItemGroup>
@@ -124,6 +126,7 @@ copy /Y $(TargetDir)$(TargetName).lib usr\lib\$(TargetName).lib</Command>
     <ClInclude Include="src\rbtree.h" />
     <ClInclude Include="src\resman.h" />
     <ClInclude Include="src\resman_impl.h" />
+    <ClInclude Include="src\timer.h" />
     <ClInclude Include="src\tpool.h" />
   </ItemGroup>
   <ItemGroup>
