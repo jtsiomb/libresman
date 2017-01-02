@@ -124,7 +124,7 @@ int resman_start_watch(struct resman *rman, struct resource *res)
 
 		rb_insert(rman->watchdirs, path, wdir);
 		rb_insert(rman->wdirbyev, wdir->over.hEvent, wdir);
-		dynarr_push(rman->watch_handles, &wdir->over.hEvent);
+		rman->watch_handles = dynarr_push(rman->watch_handles, &wdir->over.hEvent);
 	}
 
 	/* add a new watch item to this watch dir */
