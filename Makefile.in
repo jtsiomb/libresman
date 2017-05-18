@@ -10,9 +10,16 @@ api_minor = 1
 
 CFLAGS = -pedantic -Wall $(dbg) $(opt) $(pic) $(watch)
 
-ifeq ($(shell uname -s), Darwin)
+sys := $(shell uname -s | sed 's/MINGW32.*/mingw/')
+
+ifeq ($(sys), Darwin)
 	lib_so = lib$(name).dylib
 	shared = -dynamiclib
+
+else ifeq ($(sys), mingw)
+	lib_so = lib$(name).dll
+	shared = -shared -Wl,--out-implib,lib$(name)_dll.a
+	LDFLAGS += -lwinmm
 else
 	devlink = lib$(name).so
 	soname = lib$(name).so.$(api_major)
