@@ -33,3 +33,23 @@ Copyright (C) 2014-2016 John Tsiombikas <nuclear@member.fsf.org>
 libresman is free software, released under the terms of the GNU Lesser General
 Public License v3 (or at your option, any later version published by the Free
 Software Foundation). Read COPYING and COPYING.LESSER for details.
+
+
+3. Build
+
+To build and install `libresman` on UNIX, run the usual:
+
+ ./configure
+ make
+ make install
+
+See `./configure --help` for build-time options. 
+
+To build on windows, you may use the included visual studio project, or use
+mingw, in which case just follow the UNIX instructions above.
+
+To cross-compile for windows with mingw-w64, try the following incantation:
+
+ ./configure --prefix=/usr/i686-w64-mingw32
+ make CC=i686-w64-mingw32-gcc AR=i686-w64-mingw32-ar sys=mingw
+ make install sys=mingw
