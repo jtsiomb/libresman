@@ -43,7 +43,7 @@ static struct work_item *alloc_work_item(struct resman *rman);
 static void free_work_item(struct resman *rman, struct work_item *w);
 
 
-static struct thread_pool *thread_pool;
+static struct resman_thread_pool *thread_pool;
 
 
 struct resman *resman_create(void)
@@ -73,15 +73,15 @@ int resman_init(struct resman *rman)
 			num_threads = atoi(env);
 		}
 		if(num_threads < 1) {
-			if((num_threads = tpool_num_processors() - 1) < 1) {
+			if((num_threads = resman_tpool_num_processors() - 1) < 1) {
 				num_threads = 1;
 			}
 		}
-		if(!(thread_pool = tpool_create(num_threads))) {
+		if(!(thread_pool = resman_tpool_create(num_threads))) {
 			return -1;
 		}
 	}
-	tpool_addref(thread_pool);
+	resman_tpool_addref(thread_pool);
 
 	memset(rman, 0, sizeof *rman);
 	rman->tpool = thread_pool;
@@ -111,7 +111,7 @@ void resman_destroy(struct resman *rman)
 	}
 	dynarr_free(rman->res);
 
-	tpool_release(rman->tpool);
+	resman_tpool_release(rman->tpool);
 
 	resman_destroy_file_monitor(rman);
 
@@ -332,7 +332,7 @@ void resman_reload(struct resman *rman, struct resource *res)
 	pthread_mutex_unlock(&rman->lock);
 	work->res = res;
 
-	tpool_enqueue(rman->tpool, work, work_func, 0);
+	resman_tpool_enqueue(rman->tpool, work, work_func, 0);
 }
 
 /* remove a resource and leave the pointer null to reuse the slot */

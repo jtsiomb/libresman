@@ -58,7 +58,7 @@ struct resource {
 
 struct resman {
 	struct resource **res;
-	struct thread_pool *tpool;
+	struct resman_thread_pool *tpool;
 
 	pthread_mutex_t lock;	/* global resman lock (for res array changes) */
 
