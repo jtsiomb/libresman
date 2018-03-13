@@ -94,6 +94,8 @@ int resman_init(struct resman *rman)
 		return -1;
 	}
 
+	rman->opt[RESMAN_OPT_TIMESLICE] = 16;
+
 	pthread_mutex_init(&rman->lock, 0);
 	return 0;
 }
@@ -135,6 +137,22 @@ void resman_set_destroy_func(struct resman *rman, resman_destroy_func func, void
 {
 	rman->destroy_func = func;
 	rman->destroy_func_cls = cls;
+}
+
+void resman_setopt(struct resman *rman, int opt, int val)
+{
+	if(opt < 0 || opt >= RESMAN_NUM_OPTIONS) {
+		return;
+	}
+	rman->opt[opt] = val;
+}
+
+int resman_getopt(struct resman *rman, int opt)
+{
+	if(opt < 0 || opt >= RESMAN_NUM_OPTIONS) {
+		return 0;
+	}
+	return rman->opt[opt];
 }
 
 /* to avoid breaking backwards compatibility, resman_lookup is an alias for resman_add */
@@ -193,7 +211,7 @@ void resman_waitall(struct resman *rman)
 
 int resman_poll(struct resman *rman)
 {
-	int i, num_res;
+	int i, num_res, timeslice;
 	unsigned int start_time;
 
 	/* first check all the resources to see if anyone is pending deletion */
@@ -257,7 +275,8 @@ int resman_poll(struct resman *rman)
 		/* poll will be called with a high frequency anyway, so let's not spend
 		 * too much time on done callbacks each time through it
 		 */
-		if(resman_get_time_msec() - start_time > 16) {
+		timeslice = rman->opt[RESMAN_OPT_TIMESLICE];
+		if(timeslice > 0 && resman_get_time_msec() - start_time > timeslice) {
 			break;
 		}
 	}

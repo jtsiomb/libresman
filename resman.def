@@ -10,6 +10,9 @@ EXPORTS
 	resman_set_done_func
 	resman_set_destroy_func
 
+	resman_setopt
+	resman_getopt
+
 	resman_add
 	resman_lookup
 	resman_find

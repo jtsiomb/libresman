@@ -84,6 +84,8 @@ struct resman {
 
 	/* list of free work item structures for the work item allocatro */
 	struct work_item *work_items;
+
+	int opt[RESMAN_NUM_OPTIONS];
 };
 
 void resman_reload(struct resman *rman, struct resource *res);

@@ -28,6 +28,12 @@ typedef void (*resman_destroy_func)(int id, void *closure);
 
 struct resman;
 
+enum {
+	RESMAN_OPT_TIMESLICE = 0,
+
+	RESMAN_NUM_OPTIONS
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -50,6 +56,9 @@ void resman_set_done_func(struct resman *rman, resman_done_func func, void *cls)
 /* set the function to be called when a resource needs to be destroyed.
  * this function is also called in the context of the main thread. */
 void resman_set_destroy_func(struct resman *rman, resman_destroy_func func, void *cls);
+
+void resman_setopt(struct resman *rman, int opt, int val);
+int resman_getopt(struct resman *rman, int opt);
 
 /* call resman_add to add a new resource file and trigger the loading process.
  * If the file is already managed, this function is a no-op.
