@@ -38,12 +38,34 @@ void resman_free(struct resman *rman);
 int resman_init(struct resman *rman);
 void resman_destroy(struct resman *rman);
 
+/* set the function to be called when a resource file needs to be loaded.
+ * this function should perform I/O and any parts of loading which can be done
+ * in a background thread.  */
 void resman_set_load_func(struct resman *rman, resman_load_func func, void *cls);
+/* set the function to be called when loading of a resource file is completed.
+ * this function is called in the context of the main thread (the thread which
+ * calls resman_poll), and should be as fast as possible to avoid blocking the
+ * main thread for long.  */
 void resman_set_done_func(struct resman *rman, resman_done_func func, void *cls);
+/* set the function to be called when a resource needs to be destroyed.
+ * this function is also called in the context of the main thread. */
 void resman_set_destroy_func(struct resman *rman, resman_destroy_func func, void *cls);
 
-int resman_lookup(struct resman *rman, const char *fname, void *data);
-void resman_wait(struct resman *rman, int id);
+/* call resman_add to add a new resource file and trigger the loading process.
+ * If the file is already managed, this function is a no-op.
+ * Returns the resource id. */
+int resman_add(struct resman *rman, const char *fname, void *data);
+/* resman_find returns the resource id associated with a filename.
+ * If no match is found, resman_find returns -1. */
+int resman_find(struct resman *rman, const char *fname);
+/* resman_remove removes and destroys a resource. Further queries with this
+ * resource identifier will lead to undefined behavior. */
+int resman_remove(struct resman *rman, int id);
+
+/* returns number of pending jobs */
+int resman_pending(struct resman *rman);
+void resman_wait(struct resman *rman, int id); /* TODO */
+void resman_waitall(struct resman *rman);
 
 int resman_poll(struct resman *rman);
 

@@ -214,15 +214,11 @@ void resman_tpool_wait(struct resman_thread_pool *tpool)
 	pthread_mutex_unlock(&tpool->workq_mutex);
 }
 
-void resman_tpool_wait_one(struct resman_thread_pool *tpool)
+void resman_tpool_wait_pending(struct resman_thread_pool *tpool, int pending_target)
 {
-	int cur_pending;
 	pthread_mutex_lock(&tpool->workq_mutex);
-	cur_pending = tpool->qsize + tpool->nactive;
-	if(cur_pending) {
-		while(tpool->qsize + tpool->nactive >= cur_pending) {
-			pthread_cond_wait(&tpool->done_condvar, &tpool->workq_mutex);
-		}
+	while(tpool->qsize + tpool->nactive >= pending_target) {
+		pthread_cond_wait(&tpool->done_condvar, &tpool->workq_mutex);
 	}
 	pthread_mutex_unlock(&tpool->workq_mutex);
 }

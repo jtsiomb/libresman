@@ -40,8 +40,9 @@ struct resource {
 	void *data;
 	int result;	/* last callback-reported success/fail code */
 
-	int done_pending;
-	int delete_pending;
+	int pending;		/* is being enqueued or actively worked on */
+	int done_pending;	/* loading completed but done callback not called yet */
+	int delete_pending;	/* marked for deletion during the next poll */
 	pthread_mutex_t lock;
 
 	int num_loads;		/* number of loads up to now */

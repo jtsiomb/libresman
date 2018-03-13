@@ -137,7 +137,13 @@ void resman_set_destroy_func(struct resman *rman, resman_destroy_func func, void
 	rman->destroy_func_cls = cls;
 }
 
+/* to avoid breaking backwards compatibility, resman_lookup is an alias for resman_add */
 int resman_lookup(struct resman *rman, const char *fname, void *data)
+{
+	return resman_add(rman, fname, data);
+}
+
+int resman_add(struct resman *rman, const char *fname, void *data)
 {
 	int ridx;
 
@@ -149,9 +155,40 @@ int resman_lookup(struct resman *rman, const char *fname, void *data)
 	return add_resource(rman, fname, data);
 }
 
+int resman_find(struct resman *rman, const char *fname)
+{
+	return find_resource(rman, fname);
+}
+
+int resman_remove(struct resman *rman, int id)
+{
+	rman->res[id]->delete_pending = 1;
+	return 0;
+}
+
+int resman_pending(struct resman *rman)
+{
+	return resman_tpool_pending_jobs(rman->tpool);
+}
+
 void resman_wait(struct resman *rman, int id)
 {
-	/* TODO */
+	int cur_jobs;
+	struct resource *res = rman->res[id];
+
+	pthread_mutex_lock(&res->lock);
+	while(res->pending) {
+		pthread_mutex_unlock(&res->lock);
+		cur_jobs = resman_tpool_pending_jobs(rman->tpool);
+		resman_tpool_wait_pending(rman->tpool, cur_jobs - 1);
+		pthread_mutex_lock(&res->lock);
+	}
+	pthread_mutex_unlock(&res->lock);
+}
+
+void resman_waitall(struct resman *rman)
+{
+	resman_tpool_wait(rman->tpool);
 }
 
 int resman_poll(struct resman *rman)
@@ -167,7 +204,8 @@ int resman_poll(struct resman *rman)
 			continue;
 		}
 
-		if(res->delete_pending) {
+		/* also make sure we're it's off the queues/workers before deleting */
+		if(res->delete_pending && !res->pending) {
 			if(rman->destroy_func) {
 				rman->destroy_func(i, rman->destroy_func_cls);
 			}
@@ -332,6 +370,7 @@ void resman_reload(struct resman *rman, struct resource *res)
 	pthread_mutex_unlock(&rman->lock);
 	work->res = res;
 
+	res->pending = 1;
 	resman_tpool_enqueue(rman->tpool, work, work_func, 0);
 }
 
@@ -366,6 +405,8 @@ static void work_func(void *cls)
 	res->result = rman->load_func(res->name, res->id, rman->load_func_cls);
 
 	pthread_mutex_lock(&res->lock);
+	res->pending = 0;	/* no longer being worked on */
+
 	if(!rman->done_func) {
 		if(res->result == -1) {
 			/* if there's no done function and we got an error, mark this
