@@ -1,6 +1,6 @@
 /*
 libresman - a multithreaded resource data file manager.
-Copyright (C) 2014-2016  John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2014-2018  John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -64,9 +64,10 @@ int resman_remove(struct resman *rman, int id);
 
 /* returns number of pending jobs */
 int resman_pending(struct resman *rman);
-void resman_wait(struct resman *rman, int id); /* TODO */
+void resman_wait(struct resman *rman, int id);
 void resman_waitall(struct resman *rman);
 
+/* call resman_poll in your main thread to schedule done/destroy callbacks */
 int resman_poll(struct resman *rman);
 
 const char *resman_get_res_name(struct resman *rman, int res_id);
