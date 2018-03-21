@@ -110,7 +110,7 @@ int *resman_get_wait_fds(struct resman *rman, int *num_fds);
  *
  * This is a Win32-specific call. On UNIX it does nothing.
  */
-void *resman_get_wait_handles(struct resman *rman, int *num_handles);
+void **resman_get_wait_handles(struct resman *rman, int *num_handles);
 
 #ifdef __cplusplus
 }

@@ -197,6 +197,7 @@ void resman_stop_watch(struct resman *rman, struct resource *res)
 				if(witem->res == res) {
 					struct watch_item *tmp = witem;
 					wprev->next = witem->next;
+					free(tmp);
 					break;
 				}
 				witem = witem->next;

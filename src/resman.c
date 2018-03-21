@@ -394,7 +394,7 @@ int *resman_get_wait_fds(struct resman *rman, int *num_fds)
 	return 0;
 }
 
-void *resman_get_wait_handles(struct resman *rman, int *num_handles)
+void **resman_get_wait_handles(struct resman *rman, int *num_handles)
 {
 	*num_handles = dynarr_size(rman->wait_handles);
 	return rman->wait_handles;
@@ -418,7 +418,7 @@ int *resman_get_wait_fds(struct resman *rman, int *num_fds)
 	return rman->wait_fds;
 }
 
-void *resman_get_wait_handles(struct resman *rman, int *num_handles)
+void **resman_get_wait_handles(struct resman *rman, int *num_handles)
 {
 	static int once;
 	if(!once) {
