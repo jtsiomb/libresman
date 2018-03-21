@@ -47,6 +47,8 @@ struct resource {
 
 	int num_loads;		/* number of loads up to now */
 
+	unsigned long reload_timeout;	/* absolute msec of next reload (usually 0) */
+
 	/* file change monitoring */
 #ifdef WIN32
 	char *watch_path;

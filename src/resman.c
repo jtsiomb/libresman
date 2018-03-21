@@ -66,6 +66,9 @@ int resman_init(struct resman *rman)
 {
 	const char *env;
 
+	/* initialize timer */
+	resman_get_time_msec();
+
 	if(!thread_pool) {
 		/* create the thread pool if there isn't one */
 		int num_threads = 0;	/* automatically determine number of threads */
@@ -217,8 +220,8 @@ void resman_wait_all(struct resman *rman)
 
 int resman_poll(struct resman *rman)
 {
-	int i, num_res, timeslice;
-	unsigned int start_time;
+	int i, num_res;
+	unsigned long start_time, timeslice;
 
 	/* first check all the resources to see if anyone is pending deletion */
 	num_res = dynarr_size(rman->res);
@@ -256,7 +259,13 @@ int resman_poll(struct resman *rman)
 
 		pthread_mutex_lock(&res->lock);
 		if(!res->done_pending) {
+			int reload = res->reload_timeout && res->reload_timeout <= start_time;
 			pthread_mutex_unlock(&res->lock);
+			if(reload) {
+				printf("file \"%s\" modified (fd %d), delayed reload\n", res->name, res->nfd);
+				res->reload_timeout = 0;
+				resman_reload(rman, res);
+			}
 			continue;
 		}
 

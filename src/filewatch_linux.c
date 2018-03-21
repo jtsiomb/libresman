@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "filewatch.h"
 #include "resman.h"
 #include "resman_impl.h"
+#include "timer.h"
 
 static void reload_modified(struct rbnode *node, void *cls);
 
@@ -88,13 +89,55 @@ void resman_check_watch(struct resman *rman)
 	char buf[512];
 	struct inotify_event *ev;
 	int sz, evsize;
+	struct resource *res;
+	unsigned long msec;
+
+	msec = resman_get_time_msec();
 
 	while((sz = read(rman->inotify_fd, buf, sizeof buf)) > 0) {
 		ev = (struct inotify_event*)buf;
 		while(sz > 0) {
+			/*printf("inotify event %x, fd: %d\n", (unsigned int)ev->mask, ev->wd);*/
 			if(ev->mask & IN_MODIFY) {
-				/* add the file descriptor to the modified set */
-				rb_inserti(rman->modset, ev->wd, 0);
+				/* don't reload immediately on IN_MODIFY. set up a delayed reload, and
+				 * wait for IN_CLOSE_WRITE instead.
+				 */
+				if((res = rb_findi(rman->nresmap, ev->wd))) {
+					res->reload_timeout = msec + 128;
+				}
+			}
+
+			if(ev->mask & IN_CLOSE_WRITE) {
+				if((res = rb_findi(rman->nresmap, ev->wd))) {
+					/* add the file descriptor to the modified set */
+					rb_inserti(rman->modset, ev->wd, 0);
+					res->reload_timeout = 0;	/* cancel any delayed reloads */
+				}
+			}
+
+			if(ev->mask & IN_IGNORED) {
+				/* watch removed, check to see if we did it */
+				int prev_wfd;
+
+				if((res = rb_findi(rman->nresmap, ev->wd))) {
+					/* we're still tracking the resource, so inotify removed the watch
+					 * automatically because the file was deleted. Try adding the watch
+					 * again to account for programs (like vim) which delete the old file
+					 * and create a new one in its place
+					 */
+					prev_wfd = res->nfd;
+					res->nfd = 0;
+					if(resman_start_watch(rman, res) == -1) {
+						/* failed, probably removed for good */
+						fprintf(stderr, "File %s was deleted. Dropping watch\n", res->name);
+						res->nfd = prev_wfd;
+						resman_stop_watch(rman, res);
+					} else {
+						printf("restarting watch for file %s\n", res->name);
+						/* also mark it for reload */
+						rb_inserti(rman->modset, res->nfd, 0);
+					}
+				}
 			}
 
 			evsize = sizeof *ev + ev->len;

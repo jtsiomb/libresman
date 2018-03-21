@@ -106,6 +106,10 @@ void resman_tpool_destroy(struct resman_thread_pool *tpool)
 		free(tpool->threads);
 	}
 
+	/* also wake up anyone waiting on the resman_wait* calls */
+	tpool->nactive = 0;
+	pthread_cond_broadcast(&tpool->done_condvar);
+
 	pthread_mutex_destroy(&tpool->workq_mutex);
 	pthread_cond_destroy(&tpool->workq_condvar);
 	pthread_cond_destroy(&tpool->done_condvar);
@@ -217,7 +221,7 @@ void resman_tpool_wait(struct resman_thread_pool *tpool)
 void resman_tpool_wait_pending(struct resman_thread_pool *tpool, int pending_target)
 {
 	pthread_mutex_lock(&tpool->workq_mutex);
-	while(tpool->qsize + tpool->nactive >= pending_target) {
+	while(tpool->qsize + tpool->nactive > pending_target) {
 		pthread_cond_wait(&tpool->done_condvar, &tpool->workq_mutex);
 	}
 	pthread_mutex_unlock(&tpool->workq_mutex);
