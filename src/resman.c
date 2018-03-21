@@ -204,7 +204,13 @@ void resman_wait(struct resman *rman, int id)
 	pthread_mutex_unlock(&res->lock);
 }
 
-void resman_waitall(struct resman *rman)
+void resman_wait_any(struct resman *rman)
+{
+	int cur_jobs = resman_tpool_pending_jobs(rman->tpool);
+	resman_tpool_wait_pending(rman->tpool, cur_jobs - 1);
+}
+
+void resman_wait_all(struct resman *rman)
 {
 	resman_tpool_wait(rman->tpool);
 }

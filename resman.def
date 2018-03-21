@@ -20,7 +20,8 @@ EXPORTS
 
 	resman_pending
 	resman_wait
-	resman_waitall
+	resman_wait_any
+	resman_wait_all
 
 	resman_poll
 

@@ -74,7 +74,8 @@ int resman_remove(struct resman *rman, int id);
 /* returns number of pending jobs */
 int resman_pending(struct resman *rman);
 void resman_wait(struct resman *rman, int id);
-void resman_waitall(struct resman *rman);
+void resman_wait_any(struct resman *rman);
+void resman_wait_all(struct resman *rman);
 
 /* call resman_poll in your main thread to schedule done/destroy callbacks */
 int resman_poll(struct resman *rman);
