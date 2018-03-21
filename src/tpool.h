@@ -1,6 +1,6 @@
 /*
 libresman - a multithreaded resource data file manager.
-Copyright (C) 2014-2017  John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2014-2018  John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -65,6 +65,21 @@ void resman_tpool_wait(struct resman_thread_pool *tpool);
 void resman_tpool_wait_pending(struct resman_thread_pool *tpool, int pending_target);
 /* wait for all pending jobs to be completed for up to "timeout" milliseconds */
 long resman_tpool_timedwait(struct resman_thread_pool *tpool, long timeout);
+
+/* return a file descriptor which can be used to wait for pending job
+ * completion events. A single char is written every time a job completes.
+ * You should empty the pipe every time you receive such an event.
+ *
+ * This is a UNIX-specific call. On windows it does nothing.
+ */
+int resman_tpool_get_wait_fd(struct resman_thread_pool *tpool);
+
+/* return an auto-resetting Event HANDLE which can be used to wait for
+ * pending job completion events.
+ *
+ * This is a Win32-specific call. On UNIX it does nothing.
+ */
+void *resman_tpool_get_wait_handle(struct resman_thread_pool *tpool);
 
 /* returns the number of processors on the system.
  * individual cores in multi-core processors are counted as processors.

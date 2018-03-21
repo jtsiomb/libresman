@@ -73,12 +73,17 @@ int resman_remove(struct resman *rman, int id);
 
 /* returns number of pending jobs */
 int resman_pending(struct resman *rman);
-void resman_wait(struct resman *rman, int id);
+void resman_wait_job(struct resman *rman, int id);
 void resman_wait_any(struct resman *rman);
 void resman_wait_all(struct resman *rman);
 
 /* call resman_poll in your main thread to schedule done/destroy callbacks */
 int resman_poll(struct resman *rman);
+
+/* wait for any event (job completion, or file modification)
+ * you must schedule a call to resman_poll after resman_wait returns.
+ */
+int resman_wait(struct resman *rman);
 
 const char *resman_get_res_name(struct resman *rman, int res_id);
 
@@ -88,6 +93,24 @@ void *resman_get_res_data(struct resman *rman, int res_id);
 int resman_get_res_result(struct resman *rman, int res_id);
 
 int resman_get_res_load_count(struct resman *rman, int res_id);
+
+/* return pointer to an internal array of file descriptors which can be used to
+ * wait for pending jobs or file modification events. The appropriate action
+ * when any of these file descriptors are readable, is to simply call
+ * resman_poll. The size of the array is returned through num_fds.
+ *
+ * This is a UNIX-specific call. On windows it does nothing.
+ */
+int *resman_get_wait_fds(struct resman *rman, int *num_fds);
+
+/* return pointer to an internal array of HANDLEs which can be used to wait
+ * for pending jobs or file modification events. The appropriate action when
+ * any of these HANDLEs are signalled, is to simply call resman_poll. The size
+ * of the array is returned through num_handles.
+ *
+ * This is a Win32-specific call. On UNIX it does nothing.
+ */
+void *resman_get_wait_handles(struct resman *rman, int *num_handles);
 
 #ifdef __cplusplus
 }

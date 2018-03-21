@@ -18,12 +18,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-#ifndef WIN32
-#include <unistd.h>
-#include <sys/time.h>
-#endif
 #include <pthread.h>
 #include "tpool.h"
+
+#if defined(__APPLE__) && defined(__MACH__)
+# ifndef __unix__
+#  define __unix__	1
+# endif	/* unix */
+# ifndef __bsd__
+#  define __bsd__	1
+# endif	/* bsd */
+#endif	/* apple */
+
+#if defined(unix) || defined(__unix__)
+#include <unistd.h>
+#include <sys/time.h>
+
+# ifdef __bsd__
+#  include <sys/sysctl.h>
+# endif
+#endif
+
+#if defined(WIN32) || defined(__WIN32__)
+#include <windows.h>
+#endif
+
 
 struct work_item {
 	void *data;
@@ -48,9 +67,16 @@ struct resman_thread_pool {
 	int in_batch;
 
 	int nref;	/* reference count */
+
+#if defined(WIN32) || defined(__WIN32__)
+	HANDLE wait_event;
+#else
+	int wait_pipe[2];
+#endif
 };
 
 static void *thread_func(void *args);
+static void send_done_event(struct resman_thread_pool *tpool);
 
 struct resman_thread_pool *resman_tpool_create(int num_threads)
 {
@@ -63,6 +89,10 @@ struct resman_thread_pool *resman_tpool_create(int num_threads)
 	pthread_mutex_init(&tpool->workq_mutex, 0);
 	pthread_cond_init(&tpool->workq_condvar, 0);
 	pthread_cond_init(&tpool->done_condvar, 0);
+
+#if !defined(WIN32) && !defined(__WIN32__)
+	tpool->wait_pipe[0] = tpool->wait_pipe[1] = -1;
+#endif
 
 	if(num_threads <= 0) {
 		num_threads = resman_tpool_num_processors();
@@ -109,10 +139,22 @@ void resman_tpool_destroy(struct resman_thread_pool *tpool)
 	/* also wake up anyone waiting on the resman_wait* calls */
 	tpool->nactive = 0;
 	pthread_cond_broadcast(&tpool->done_condvar);
+	send_done_event(tpool);
 
 	pthread_mutex_destroy(&tpool->workq_mutex);
 	pthread_cond_destroy(&tpool->workq_condvar);
 	pthread_cond_destroy(&tpool->done_condvar);
+
+#if defined(WIN32) || defined(__WIN32__)
+	if(tpool->wait_event) {
+		CloseHandle(tpool->wait_event);
+	}
+#else
+	if(tpool->wait_pipe[0] >= 0) {
+		close(tpool->wait_pipe[0]);
+		close(tpool->wait_pipe[1]);
+	}
+#endif
 }
 
 int resman_tpool_addref(struct resman_thread_pool *tpool)
@@ -227,8 +269,44 @@ void resman_tpool_wait_pending(struct resman_thread_pool *tpool, int pending_tar
 	pthread_mutex_unlock(&tpool->workq_mutex);
 }
 
-/* TODO: implement for win32 */
-#ifndef WIN32
+#if defined(WIN32) || defined(__WIN32__)
+long resman_tpool_timedwait(struct resman_thread_pool *tpool, long timeout)
+{
+	fprintf(stderr, "tpool_timedwait currently unimplemented on windows\n");
+	abort();
+	return 0;
+}
+
+/* TODO: actually does this work with MinGW ? */
+int resman_tpool_get_wait_fd(struct resman_thread_pool *tpool)
+{
+	static int once;
+	if(!once) {
+		once = 1;
+		fprintf(stderr, "warning: tpool_get_wait_fd call on Windows does nothing\n");
+	}
+	return 0;
+}
+
+void *resman_tpool_get_wait_handle(struct resman_thread_pool *tpool)
+{
+	if(!tpool->wait_event) {
+		if(!(tpool->wait_event = CreateEvent(0, 0, 0, 0))) {
+			return 0;
+		}
+	}
+	return tpool->wait_event;
+}
+
+static void send_done_event(struct resman_thread_pool *tpool)
+{
+	if(tpool->wait_event) {
+		SetEvent(tpool->wait_event);
+	}
+}
+
+#else		/* UNIX */
+
 long resman_tpool_timedwait(struct resman_thread_pool *tpool, long timeout)
 {
 	struct timespec tout_ts;
@@ -251,7 +329,34 @@ long resman_tpool_timedwait(struct resman_thread_pool *tpool, long timeout)
 	gettimeofday(&tv, 0);
 	return (tv.tv_sec - tv0.tv_sec) * 1000 + (tv.tv_usec - tv0.tv_usec) / 1000;
 }
-#endif
+
+int resman_tpool_get_wait_fd(struct resman_thread_pool *tpool)
+{
+	if(tpool->wait_pipe[0] < 0) {
+		if(pipe(tpool->wait_pipe) == -1) {
+			return -1;
+		}
+	}
+	return tpool->wait_pipe[0];
+}
+
+void *resman_tpool_get_wait_handle(struct resman_thread_pool *tpool)
+{
+	static int once;
+	if(!once) {
+		once = 1;
+		fprintf(stderr, "warning: tpool_get_wait_handle call on UNIX does nothing\n");
+	}
+	return 0;
+}
+
+static void send_done_event(struct resman_thread_pool *tpool)
+{
+	if(tpool->wait_pipe[1] >= 0) {
+		write(tpool->wait_pipe[1], tpool, 1);
+	}
+}
+#endif	/* WIN32/UNIX */
 
 static void *thread_func(void *args)
 {
@@ -280,6 +385,7 @@ static void *thread_func(void *args)
 			pthread_mutex_lock(&tpool->workq_mutex);
 			/* notify everyone interested that we're done with this job */
 			pthread_cond_broadcast(&tpool->done_condvar);
+			send_done_event(tpool);
 			--tpool->nactive;
 		}
 	}
@@ -294,29 +400,6 @@ static void *thread_func(void *args)
  * to autodetect how many threads to spawn.
  * Currently works on: Linux, BSD, Darwin, and Windows.
  */
-
-#if defined(__APPLE__) && defined(__MACH__)
-# ifndef __unix__
-#  define __unix__	1
-# endif	/* unix */
-# ifndef __bsd__
-#  define __bsd__	1
-# endif	/* bsd */
-#endif	/* apple */
-
-#if defined(unix) || defined(__unix__)
-#include <unistd.h>
-
-# ifdef __bsd__
-#  include <sys/sysctl.h>
-# endif
-#endif
-
-#if defined(WIN32) || defined(__WIN32__)
-#include <windows.h>
-#endif
-
-
 int resman_tpool_num_processors(void)
 {
 #if defined(unix) || defined(__unix__)

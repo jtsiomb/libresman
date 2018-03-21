@@ -48,10 +48,6 @@ static void clean_path(char *path);
 
 int resman_init_file_monitor(struct resman *rman)
 {
-	if(!(rman->watch_handles = dynarr_alloc(0, sizeof *rman->watch_handles))) {
-		return -1;
-	}
-
 	rman->nresmap = rb_create(RB_KEY_ADDR);
 	rman->watchdirs = rb_create(RB_KEY_STRING);
 	rman->wdirbyev = rb_create(RB_KEY_ADDR);
@@ -61,8 +57,6 @@ int resman_init_file_monitor(struct resman *rman)
 
 void resman_destroy_file_monitor(struct resman *rman)
 {
-	dynarr_free(rman->watch_handles);
-
 	rb_free(rman->nresmap);
 	rb_free(rman->watchdirs);
 	rb_free(rman->wdirbyev);
@@ -124,7 +118,7 @@ int resman_start_watch(struct resman *rman, struct resource *res)
 
 		rb_insert(rman->watchdirs, path, wdir);
 		rb_insert(rman->wdirbyev, wdir->over.hEvent, wdir);
-		rman->watch_handles = dynarr_push(rman->watch_handles, &wdir->over.hEvent);
+		rman->wait_handles = dynarr_push(rman->wait_handles, &wdir->over.hEvent);
 	}
 
 	/* add a new watch item to this watch dir */
@@ -167,14 +161,14 @@ void resman_stop_watch(struct resman *rman, struct resource *res)
 
 	/* if there is no other reference to this watch dir, destroy it */
 	if(--wdir->nref <= 0) {
-		/* find the handle in the watch_handles array and remove it */
-		sz = dynarr_size(rman->watch_handles);
+		/* find the handle in the wait_handles array and remove it */
+		sz = dynarr_size(rman->wait_handles);
 		for(i=0; i<sz; i++) {
-			if(rman->watch_handles[i] == wdir->handle) {
+			if(rman->wait_handles[i] == wdir->handle) {
 				/* swap the end for it and pop */
-				rman->watch_handles[i] = rman->watch_handles[sz - 1];
-				rman->watch_handles[sz - 1] = 0;
-				dynarr_pop(rman->watch_handles);
+				rman->wait_handles[i] = rman->wait_handles[sz - 1];
+				rman->wait_handles[sz - 1] = 0;
+				dynarr_pop(rman->wait_handles);
 				break;
 			}
 		}
@@ -266,24 +260,26 @@ void resman_check_watch(struct resman *rman)
 	struct watch_dir *wdir;
 	unsigned int idx;
 
-	unsigned int num_handles = dynarr_size(rman->watch_handles);
+	unsigned int num_handles = dynarr_size(rman->wait_handles);
 	if(!num_handles) {
 		return;
 	}
 
-	idx = WaitForMultipleObjectsEx(num_handles, rman->watch_handles, FALSE, 0, TRUE);
+	idx = WaitForMultipleObjectsEx(num_handles, rman->wait_handles, FALSE, 0, TRUE);
 	if(idx == WAIT_FAILED) {
 		unsigned int err = GetLastError();
 		fprintf(stderr, "failed to check for file modification: %u\n", err);
 		return;
 	}
 	if(idx >= WAIT_OBJECT_0 && idx < WAIT_OBJECT_0 + num_handles) {
-		if(!(wdir = rb_find(rman->wdirbyev, rman->watch_handles[idx]))) {
-			fprintf(stderr, "got change handle, but failed to find corresponding watch_dir!\n");
+		if(!(wdir = rb_find(rman->wdirbyev, rman->wait_handles[idx]))) {
+			if(rman->wait_handles[idx] != rman->tpool_wait_handle) {
+				fprintf(stderr, "got change handle, but failed to find corresponding watch_dir!\n");
+			}
 			return;
 		}
 
-		handle_event(rman, rman->watch_handles[idx], wdir);
+		handle_event(rman, rman->wait_handles[idx], wdir);
 
 		/* restart the watch call */
 		ReadDirectoryChangesW(wdir->handle, wdir->buf, RES_BUF_SIZE, FALSE, FILE_NOTIFY_CHANGE_LAST_WRITE, 0, &wdir->over, 0);

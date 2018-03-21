@@ -54,7 +54,7 @@ struct resource {
 	char *watch_path;
 #endif
 #ifdef __linux__
-	int nfd;
+	int nfd;	/* notify file descriptor */
 #endif
 };
 
@@ -75,16 +75,21 @@ struct resman {
 
 	/* file change monitoring */
 	struct rbtree *nresmap;
+#ifdef WIN32
+	struct rbtree *watchdirs, *wdirbyev;
+
+	HANDLE tpool_wait_handle;
+	HANDLE *wait_handles;	/* dynamic array of all the waitable handles (watchdir + tpool) */
+#else /* UNIX */
 #ifdef __linux__
 	int inotify_fd;
 	struct rbtree *modset;
 #endif
-#ifdef WIN32
-	struct rbtree *watchdirs, *wdirbyev;
-	HANDLE *watch_handles;	/* dynamic array of all the watched directory handles */
+	int tpool_wait_fd;
+	int *wait_fds;	/* dynamic array of all the waitable fds (inotify + tpool) */
 #endif
 
-	/* list of free work item structures for the work item allocatro */
+	/* list of free work item structures for the work item allocator */
 	struct work_item *work_items;
 
 	int opt[RESMAN_NUM_OPTIONS];

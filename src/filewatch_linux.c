@@ -1,6 +1,6 @@
 /*
 libresman - a multithreaded resource data file manager.
-Copyright (C) 2014-2016  John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2014-2018  John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "resman.h"
 #include "resman_impl.h"
 #include "timer.h"
+#include "dynarr.h"
 
 static void reload_modified(struct rbnode *node, void *cls);
 
@@ -34,6 +35,10 @@ int resman_init_file_monitor(struct resman *rman)
 	int fd;
 
 	if((fd = inotify_init()) == -1) {
+		return -1;
+	}
+	if(!(rman->wait_fds = dynarr_push(rman->wait_fds, &fd))) {
+		close(fd);
 		return -1;
 	}
 	/* set non-blocking flag, to allow polling by reading */

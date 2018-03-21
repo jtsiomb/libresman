@@ -19,12 +19,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
 #include <pthread.h>
 #include "resman.h"
 #include "resman_impl.h"
 #include "dynarr.h"
 #include "filewatch.h"
 #include "timer.h"
+
+#if defined(WIN32) || defined(__WIN32__)
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/select.h>
+#endif
 
 struct work_item {
 	struct resman *rman;
@@ -42,6 +51,7 @@ static void work_func(void *cls);
 static struct work_item *alloc_work_item(struct resman *rman);
 static void free_work_item(struct resman *rman, struct work_item *w);
 
+static void wait_for_any_event(struct resman *rman);
 
 static struct resman_thread_pool *thread_pool;
 
@@ -89,6 +99,27 @@ int resman_init(struct resman *rman)
 	memset(rman, 0, sizeof *rman);
 	rman->tpool = thread_pool;
 
+#if defined(WIN32) || defined(__WIN32__)
+	if(!(rman->wait_handles = dynarr_alloc(0, sizeof *rman->wait_handles))) {
+		return -1;
+	}
+	rman->tpool_wait_handle = resman_tpool_get_wait_handle(rman->tpool);
+	if(!(rman->wait_handles = dynarr_push(rman->wait_handles, &rman->tpool_wait_handle))) {
+		return -1;
+	}
+#else
+	if(!(rman->wait_fds = dynarr_alloc(0, sizeof *rman->wait_fds))) {
+		return -1;
+	}
+	rman->tpool_wait_fd = resman_tpool_get_wait_fd(rman->tpool);
+	if(!(rman->wait_fds = dynarr_push(rman->wait_fds, &rman->tpool_wait_fd))) {
+		return -1;
+	}
+	/* make pipe read end nonblocking */
+	fcntl(rman->tpool_wait_fd, F_SETFL, fcntl(rman->tpool_wait_fd, F_GETFL) | O_NONBLOCK);
+#endif
+
+
 	if(resman_init_file_monitor(rman) == -1) {
 		return -1;
 	}
@@ -118,6 +149,11 @@ void resman_destroy(struct resman *rman)
 
 	resman_tpool_release(rman->tpool);
 
+#if defined(WIN32) || defined(__WIN32__)
+	dynarr_free(rman->wait_handles);
+#else
+	dynarr_free(rman->wait_fds);
+#endif
 	resman_destroy_file_monitor(rman);
 
 	pthread_mutex_destroy(&rman->lock);
@@ -192,7 +228,7 @@ int resman_pending(struct resman *rman)
 	return resman_tpool_pending_jobs(rman->tpool);
 }
 
-void resman_wait(struct resman *rman, int id)
+void resman_wait_job(struct resman *rman, int id)
 {
 	int cur_jobs;
 	struct resource *res = rman->res[id];
@@ -244,6 +280,10 @@ int resman_poll(struct resman *rman)
 	/* then check for modified files */
 	resman_check_watch(rman);
 
+#if !defined(WIN32) && !defined(__WIN32__)
+	/* empty the thread pool event pipe (fd is nonblocking) */
+	while(read(rman->tpool_wait_fd, &i, sizeof i) > 0);
+#endif
 
 	if(!rman->done_func) {
 		return 0;	/* no done callback; there's no point in checking anything */
@@ -262,7 +302,7 @@ int resman_poll(struct resman *rman)
 			int reload = res->reload_timeout && res->reload_timeout <= start_time;
 			pthread_mutex_unlock(&res->lock);
 			if(reload) {
-				printf("file \"%s\" modified (fd %d), delayed reload\n", res->name, res->nfd);
+				printf("file \"%s\" modified, delayed reload\n", res->name);
 				res->reload_timeout = 0;
 				resman_reload(rman, res);
 			}
@@ -295,6 +335,12 @@ int resman_poll(struct resman *rman)
 			break;
 		}
 	}
+	return 0;
+}
+
+int resman_wait(struct resman *rman)
+{
+	wait_for_any_event(rman);
 	return 0;
 }
 
@@ -336,6 +382,75 @@ int resman_get_res_load_count(struct resman *rman, int res_id)
 	}
 	return -1;
 }
+
+#if defined(WIN32) || defined(__WIN32__)
+int *resman_get_wait_fds(struct resman *rman, int *num_fds)
+{
+	static int once;
+	if(!once) {
+		once = 1;
+		fprintf(stderr, "warning: resman_get_wait_fds does nothing on windows\n");
+	}
+	return 0;
+}
+
+void *resman_get_wait_handles(struct resman *rman, int *num_handles)
+{
+	*num_handles = dynarr_size(rman->wait_handles);
+	return rman->wait_handles;
+}
+
+static void wait_for_any_event(struct resman *rman)
+{
+	unsigned int num_handles;
+
+	if(!(num_handles = dynarr_size(rman->wait_handles))) {
+		return;
+	}
+
+	WaitForMultipleObjectsEx(num_handles, rman->wait_handles, FALSE, INFINITE, TRUE);
+}
+
+#else /* UNIX */
+int *resman_get_wait_fds(struct resman *rman, int *num_fds)
+{
+	*num_fds = dynarr_size(rman->wait_fds);
+	return rman->wait_fds;
+}
+
+void *resman_get_wait_handles(struct resman *rman, int *num_handles)
+{
+	static int once;
+	if(!once) {
+		once = 1;
+		fprintf(stderr, "warning: resman_get_wait_handles does nothing on UNIX\n");
+	}
+	return 0;
+}
+
+static void wait_for_any_event(struct resman *rman)
+{
+	int i, res, numfds, maxfd = 0;
+	fd_set rdset;
+
+	if(!(numfds = dynarr_size(rman->wait_fds))) {
+		return;
+	}
+
+	FD_ZERO(&rdset);
+	for(i=0; i<numfds; i++) {
+		int fd = rman->wait_fds[i];
+		FD_SET(fd, &rdset);
+		if(fd > maxfd) maxfd = fd;
+	}
+
+	while((res = select(maxfd + 1, &rdset, 0, 0, 0)) == -1 && errno == EINTR);
+
+	if(res == -1) {
+		fprintf(stderr, "failed to wait for any events: %s\n", strerror(errno));
+	}
+}
+#endif
 
 static int find_resource(struct resman *rman, const char *fname)
 {

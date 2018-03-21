@@ -19,14 +19,18 @@ EXPORTS
 	resman_remove
 
 	resman_pending
-	resman_wait
+	resman_wait_job
 	resman_wait_any
 	resman_wait_all
 
 	resman_poll
+	resman_wait
 
 	resman_get_res_name
 	resman_set_res_data
 	resman_get_res_data
 	resman_get_res_result
 	resman_get_res_load_count
+
+	resman_get_wait_fds
+	resman_get_wait_handles
