@@ -78,6 +78,10 @@ struct resman_thread_pool {
 static void *thread_func(void *args);
 static void send_done_event(struct resman_thread_pool *tpool);
 
+static struct work_item *alloc_work_item(void);
+static void free_work_item(struct work_item *w);
+
+
 struct resman_thread_pool *resman_tpool_create(int num_threads)
 {
 	int i;
@@ -187,7 +191,7 @@ int resman_tpool_enqueue(struct resman_thread_pool *tpool, void *data,
 {
 	struct work_item *job;
 
-	if(!(job = malloc(sizeof *job))) {
+	if(!(job = alloc_work_item())) {
 		return -1;
 	}
 	job->work = work_func;
@@ -381,6 +385,7 @@ static void *thread_func(void *args)
 			if(job->done) {
 				job->done(job->data);
 			}
+			free_work_item(job);
 
 			pthread_mutex_lock(&tpool->workq_mutex);
 			/* notify everyone interested that we're done with this job */
@@ -425,4 +430,40 @@ int resman_tpool_num_processors(void)
 	GetSystemInfo(&info);
 	return info.dwNumberOfProcessors;
 #endif
+}
+
+#define MAX_WPOOL_SIZE	64
+static pthread_mutex_t wpool_lock = PTHREAD_MUTEX_INITIALIZER;
+static struct work_item *wpool;
+static int wpool_size;
+
+/* work item allocator */
+static struct work_item *alloc_work_item(void)
+{
+	struct work_item *w;
+
+	pthread_mutex_lock(&wpool_lock);
+	if(!wpool) {
+		pthread_mutex_unlock(&wpool_lock);
+		return malloc(sizeof(struct work_item));
+	}
+
+	w = wpool;
+	wpool = wpool->next;
+	--wpool_size;
+	pthread_mutex_unlock(&wpool_lock);
+	return w;
+}
+
+static void free_work_item(struct work_item *w)
+{
+	pthread_mutex_lock(&wpool_lock);
+	if(wpool_size >= MAX_WPOOL_SIZE) {
+		free(w);
+	} else {
+		w->next = wpool;
+		wpool = w;
+		++wpool_size;
+	}
+	pthread_mutex_unlock(&wpool_lock);
 }

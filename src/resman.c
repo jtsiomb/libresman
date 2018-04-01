@@ -143,6 +143,7 @@ void resman_destroy(struct resman *rman)
 		if(rman->destroy_func) {
 			rman->destroy_func(i, rman->destroy_func_cls);
 		}
+		free(rman->res[i]->name);
 		free(rman->res[i]);
 	}
 	dynarr_free(rman->res);
@@ -481,7 +482,7 @@ static int add_resource(struct resman *rman, const char *fname, void *data)
 	res->data = data;
 	pthread_mutex_init(&res->lock, 0);
 
-	/* check to see if there's an emtpy (previously erased) slot */
+	/* check to see if there's an empty (previously erased) slot */
 	for(i=0; i<size; i++) {
 		if(!rman->res[i]) {
 			idx = i;
@@ -494,6 +495,7 @@ static int add_resource(struct resman *rman, const char *fname, void *data)
 		idx = size;
 
 		if(!(tmparr = dynarr_push(rman->res, &res))) {
+			free(res->name);
 			free(res);
 			return -1;
 		}
@@ -526,15 +528,18 @@ void resman_reload(struct resman *rman, struct resource *res)
 /* remove a resource and leave the pointer null to reuse the slot */
 static void remove_resource(struct resman *rman, int idx)
 {
-	resman_stop_watch(rman, rman->res[idx]);
+	struct resource *res = rman->res[idx];
+
+	resman_stop_watch(rman, res);
 
 	if(rman->destroy_func) {
 		rman->destroy_func(idx, rman->destroy_func_cls);
 	}
 
-	pthread_mutex_destroy(&rman->res[idx]->lock);
+	pthread_mutex_destroy(&res->lock);
 
-	free(rman->res[idx]);
+	free(res->name);
+	free(res);
 	rman->res[idx] = 0;
 }
 
