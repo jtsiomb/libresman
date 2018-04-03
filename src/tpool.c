@@ -368,7 +368,10 @@ static void *thread_func(void *args)
 
 	pthread_mutex_lock(&tpool->workq_mutex);
 	while(!tpool->should_quit) {
-		pthread_cond_wait(&tpool->workq_condvar, &tpool->workq_mutex);
+		if(!tpool->workq) {
+			pthread_cond_wait(&tpool->workq_condvar, &tpool->workq_mutex);
+			if(tpool->should_quit) break;
+		}
 
 		while(!tpool->should_quit && tpool->workq) {
 			/* grab the first job */

@@ -35,11 +35,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/select.h>
 #endif
 
-struct work_item {
+struct task {
 	struct resman *rman;
 	struct resource *res;
 
-	struct work_item *next;
+	struct task *next;
 };
 
 
@@ -48,8 +48,8 @@ static int add_resource(struct resman *rman, const char *fname, void *data);
 static void remove_resource(struct resman *rman, int idx);
 static void work_func(void *cls);
 /* these two functions should only be called with the resman mutex locked */
-static struct work_item *alloc_work_item(struct resman *rman);
-static void free_work_item(struct resman *rman, struct work_item *w);
+static struct task *alloc_task(struct resman *rman);
+static void free_task(struct resman *rman, struct task *w);
 
 static void wait_for_any_event(struct resman *rman);
 
@@ -513,11 +513,11 @@ static int add_resource(struct resman *rman, const char *fname, void *data)
 
 void resman_reload(struct resman *rman, struct resource *res)
 {
-	struct work_item *work;
+	struct task *work;
 
 	/* start a loading job ... */
 	pthread_mutex_lock(&rman->lock);
-	work = alloc_work_item(rman);
+	work = alloc_task(rman);
 	pthread_mutex_unlock(&rman->lock);
 	work->res = res;
 
@@ -548,12 +548,12 @@ static void remove_resource(struct resman *rman, int idx)
  */
 static void work_func(void *cls)
 {
-	struct work_item *work = cls;
+	struct task *work = cls;
 	struct resource *res = work->res;
 	struct resman *rman = work->rman;
 
 	pthread_mutex_lock(&res->lock);
-	free_work_item(rman, work);
+	free_task(rman, work);
 	pthread_mutex_unlock(&res->lock);
 
 	res->result = rman->load_func(res->name, res->id, rman->load_func_cls);
@@ -581,13 +581,13 @@ static void work_func(void *cls)
 	pthread_mutex_unlock(&res->lock);
 }
 
-static struct work_item *alloc_work_item(struct resman *rman)
+static struct task *alloc_task(struct resman *rman)
 {
-	struct work_item *res;
+	struct task *res;
 
-	if(rman->work_items) {
-		res = rman->work_items;
-		rman->work_items = res->next;
+	if(rman->tasks) {
+		res = rman->tasks;
+		rman->tasks = res->next;
 	} else {
 		if(!(res = malloc(sizeof *res))) {
 			perror("failed to allocate resman work item");
@@ -598,8 +598,8 @@ static struct work_item *alloc_work_item(struct resman *rman)
 	return res;
 }
 
-static void free_work_item(struct resman *rman, struct work_item *w)
+static void free_task(struct resman *rman, struct task *w)
 {
-	w->next = rman->work_items;
-	rman->work_items = w;
+	w->next = rman->tasks;
+	rman->tasks = w;
 }

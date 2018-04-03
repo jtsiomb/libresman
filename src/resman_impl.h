@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 #include "resman.h"
 
-struct work_item;
+struct task;
 
 struct resource {
 	int id;
@@ -90,7 +90,7 @@ struct resman {
 #endif
 
 	/* list of free work item structures for the work item allocator */
-	struct work_item *work_items;
+	struct task *tasks;
 
 	int opt[RESMAN_NUM_OPTIONS];
 };
