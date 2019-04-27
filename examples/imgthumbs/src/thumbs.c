@@ -63,7 +63,7 @@ struct thumbnail *create_thumbs(const char *dirpath)
 		node->aspect = 1.0;
 
 		if(dbg_load_async) {
-			resman_lookup(texman, node->fname, node);
+			resman_add(texman, node->fname, node);
 		} else {
 			img_init(&img);
 			if(img_load(&img, node->fname) == -1) {
