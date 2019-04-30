@@ -140,6 +140,8 @@ void resman_destroy(struct resman *rman)
 	if(!rman) return;
 
 	for(i=0; i<dynarr_size(rman->res); i++) {
+		if(!rman->res[i]) continue;
+
 		if(rman->destroy_func) {
 			rman->destroy_func(i, rman->destroy_func_cls);
 		}
