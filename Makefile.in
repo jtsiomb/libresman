@@ -7,7 +7,7 @@ lib_a = lib$(name).a
 sodir = lib
 
 api_major = 0
-api_minor = 1
+api_minor = 2
 
 CFLAGS = -pedantic -Wall $(dbg) $(opt) $(pic) $(watch)
 LDFLAGS = -lpthread
