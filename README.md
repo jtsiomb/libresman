@@ -28,7 +28,7 @@ how to use the library.
 
 License
 -------
-Copyright (C) 2014-2016 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2014-2019 John Tsiombikas <nuclear@member.fsf.org>
 
 libresman is free software, released under the terms of the GNU Lesser General
 Public License v3 (or at your option, any later version published by the Free
